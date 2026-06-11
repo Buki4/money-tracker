@@ -55,7 +55,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 24px 20px 16px;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 20px 16px;
 }
 
 .user-info {
@@ -222,7 +222,6 @@ body {
     backdrop-filter: blur(10px);
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     transform-origin: top;
-    animation: slideInItem 0.3s ease-out forwards;
 }
 
 .tx-info {
@@ -250,7 +249,7 @@ body {
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: space-around;
-    align-items: center;
+    align-items: flex-start;
     padding-top: 16px;
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 10px)); /* for iPhone and Android nav bars */
 }
@@ -451,7 +450,6 @@ body {
     align-items: center;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     transform-origin: top;
-    animation: slideInItem 0.3s ease-out forwards;
 }
 
 @keyframes slideInItem {
@@ -468,6 +466,27 @@ body {
     overflow: hidden;
     pointer-events: none;
     border: none !important;
+}
+
+.stagger-item {
+    animation: slideInItem 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+}
+
+.view-sliding-left {
+    animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.view-sliding-right {
+    animation: slideRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideLeft {
+    from { opacity: 0; transform: translateX(50px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideRight {
+    from { opacity: 0; transform: translateX(-50px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 .debt-item .person { font-weight: 500; }

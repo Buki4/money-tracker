@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tempo Finance</title>
+    <title>Tempo Tracker</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <meta name="theme-color" content="#0f172a">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -191,8 +192,8 @@
                     <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
                         <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 8px;">Названия вкладок</label>
                         <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                            <input type="text" id="tabNameInput1" placeholder="Вкладка 1 (Барабаны)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px;">
-                            <input type="text" id="tabNameInput2" placeholder="Вкладка 2 (Вокал)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px;">
+                            <input type="text" id="tabNameInput1" placeholder="Вкладка 1 (Барабаны)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px; height: 42px; box-sizing: border-box;">
+                            <input type="text" id="tabNameInput2" placeholder="Вкладка 2 (Вокал)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px; height: 42px; box-sizing: border-box;">
                         </div>
                         <button id="saveTabNamesBtn" class="submit-btn" style="margin-top: 0; background: var(--income);">Сохранить названия</button>
                     </div>

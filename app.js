@@ -236,6 +236,40 @@ function showToast(msg) {
     setTimeout(() => toastEl.classList.remove('show'), 2500);
 }
 
+let prevStats = { overallBalance: 0, balance: 0, income: 0, expense: 0 };
+
+function animateValue(obj, start, end, duration, formatFn) {
+    if (start === end) {
+        if(obj) obj.innerHTML = formatFn(end);
+        return;
+    }
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 4); // easeOutQuart
+        const current = start + (end - start) * ease;
+        if(obj) obj.innerHTML = formatFn(current);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            if(obj) obj.innerHTML = formatFn(end);
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+function animateViewChange(direction) {
+    const container = currentView === 'dashboard' ? document.getElementById('dashboardView') : document.getElementById('debtsView');
+    if(!container) return;
+    container.classList.remove('view-sliding-left', 'view-sliding-right');
+    void container.offsetWidth; // trigger reflow
+    container.classList.add(direction === 'left' ? 'view-sliding-left' : 'view-sliding-right');
+    setTimeout(() => {
+        container.classList.remove('view-sliding-left', 'view-sliding-right');
+    }, 300);
+}
+
 // Render Functions
 function render() {
     if(tabNameDrums) tabNameDrums.textContent = state.tabNames.drums || 'Барабаны';
@@ -257,35 +291,20 @@ function renderDashboard() {
         }
     });
     
-    const overallBalance = overallIncome - overallExpense;
-    overallBalanceEl.textContent = `${overallBalance.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
-    overallBalanceEl.style.color = overallBalance >= 0 ? 'var(--income)' : 'var(--expense)';
+    const formatTotal = (val) => `${val.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+    const formatProfit = (val) => `Общий профит: <span style="color: ${val >= 0 ? 'var(--income)' : 'var(--expense)'}">${val > 0 ? '+' : ''}${formatTotal(val)}</span>`;
+    
+    if (overallBalanceEl) overallBalanceEl.innerHTML = formatProfit(overallBalance);
+    // Note: overallBalance is handled differently in HTML, let's just update the value directly without animation for profit
+    
+    animateValue(totalBalanceEl, prevStats.balance, balance, 600, formatTotal);
+    animateValue(totalIncomeEl, prevStats.income, income, 600, formatTotal);
+    animateValue(totalExpenseEl, prevStats.expense, expense, 600, formatTotal);
 
-    // 2. Filter transactions by tab, month and search query
-    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
-    const filteredTx = state.transactions.filter(tx => {
-        const d = new Date(tx.date);
-        const matchMonth = tx.tab === currentTab && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-        const matchSearch = searchQuery === '' || 
-                            (tx.note && tx.note.toLowerCase().includes(searchQuery)) || 
-                            (tx.person && tx.person.toLowerCase().includes(searchQuery)) ||
-                            (tx.category && tx.category.toLowerCase().includes(searchQuery));
-        return matchMonth && matchSearch;
-    });
-
-    let income = 0;
-    let expense = 0;
-
-    filteredTx.forEach(tx => {
-        if (tx.type === 'income') income += tx.amount;
-        if (tx.type === 'expense') expense += tx.amount;
-    });
-
-    const balance = income - expense;
-
-    totalBalanceEl.textContent = `${balance.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
-    totalIncomeEl.textContent = `${income.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
-    totalExpenseEl.textContent = `${expense.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+    prevStats.overallBalance = overallBalance;
+    prevStats.balance = balance;
+    prevStats.income = income;
+    prevStats.expense = expense;
 
     // Render list
     transactionsListEl.innerHTML = '';
@@ -296,6 +315,7 @@ function renderDashboard() {
         filteredTx.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         let currentDateGroup = null;
+        let renderIndex = 0;
         
         filteredTx.forEach(tx => {
             const txDateObj = new Date(tx.date);
@@ -312,10 +332,12 @@ function renderDashboard() {
             
             if (dateLabel !== currentDateGroup) {
                 const header = document.createElement('div');
-                header.className = 'date-header';
+                header.className = 'date-header stagger-item';
+                header.style.animationDelay = `${renderIndex * 0.05}s`;
                 header.textContent = dateLabel;
                 transactionsListEl.appendChild(header);
                 currentDateGroup = dateLabel;
+                renderIndex++;
             }
 
             const catLabel = categories[tx.tab].find(c => c.id === tx.category)?.label || tx.category;
@@ -324,7 +346,8 @@ function renderDashboard() {
             const personStr = tx.person ? ` • ${tx.person}` : '';
             
             const el = document.createElement('div');
-            el.className = 'transaction-item';
+            el.className = 'transaction-item stagger-item';
+            el.style.animationDelay = `${renderIndex * 0.05}s`;
             el.id = `tx-${tx.id}`;
             el.innerHTML = `
                 <div class="tx-info" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
@@ -337,6 +360,7 @@ function renderDashboard() {
                 </div>
             `;
             transactionsListEl.appendChild(el);
+            renderIndex++;
         });
     }
 }
@@ -354,33 +378,37 @@ function renderDebts() {
     if (filteredDebts.length === 0) {
         debtsListEl.innerHTML = '<div class="empty-state">Нет долгов</div>';
     } else {
+        let renderIndex = 0;
         filteredDebts.forEach(debt => {
             if (debt.type === 'owed_to_me') owedSum += debt.amount;
             else iOweSum += debt.amount;
             
-            const isOwedToMe = debt.type === 'owed_to_me';
-            const cls = isOwedToMe ? 'owed' : 'i-owe';
-            const sign = isOwedToMe ? '+' : '-';
-            const label = isOwedToMe ? 'Мне должны' : 'Я должен';
-
             const el = document.createElement('div');
-            el.className = 'debt-item';
+            el.className = 'debt-item stagger-item';
+            el.style.animationDelay = `${renderIndex * 0.05}s`;
             el.id = `debt-${debt.id}`;
+            
+            const isOwed = debt.type === 'owed_to_me';
+            const label = isOwed ? 'Мне должны' : 'Я должен';
+            
             el.innerHTML = `
                 <div style="flex:1;">
-                    <div class="person">${debt.person || 'Неизвестно'}</div>
+                    <div class="person" style="font-weight: 500;">${debt.person || 'Неизвестно'}</div>
                     <div style="font-size: 11px; color: var(--text-muted);">${label}</div>
                     ${debt.note ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${debt.note}</div>` : ''}
                 </div>
-                <div style="display: flex; align-items: flex-end; flex-direction: column; gap: 8px;">
-                    <div class="amount ${cls}">${sign}${debt.amount.toLocaleString('ru-RU')} €</div>
-                    <div style="display: flex; gap: 8px;">
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <div class="amount ${isOwed ? 'owed' : 'owe'}" style="font-weight: 600; font-size: 16px; color: ${isOwed ? 'var(--income)' : 'var(--expense)'}">
+                        ${isOwed ? '+' : '-'}${debt.amount.toLocaleString('ru-RU')} €
+                    </div>
+                    <div style="display: flex; gap: 6px;">
                         <button class="pay-btn" onclick="payDebt('${debt.id}')">Вернули</button>
                         <button class="pay-btn" style="color: var(--expense); border-color: rgba(239, 68, 68, 0.3);" onclick="deleteDebt('${debt.id}')">Удалить</button>
                     </div>
                 </div>
             `;
             debtsListEl.appendChild(el);
+            renderIndex++;
         });
     }
     
@@ -475,6 +503,15 @@ window.payDebt = function(id) {
     saveData();
     render();
     showToast('Долг погашен!');
+    
+    if (window.confetti) {
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#10b981', '#3b82f6', '#8b5cf6']
+        });
+    }
 };
 
 // Event Listeners
@@ -541,27 +578,47 @@ function setupEventListeners() {
     });
 
     // Bottom Nav
-    navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            navItems.forEach(n => n.classList.remove('active'));
-            item.classList.add('active');
-            
-            const viewId = item.getAttribute('data-view');
-            views.forEach(v => v.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
-        });
+    navHome.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentView === 'dashboard') return;
+        currentView = 'dashboard';
+        navHome.classList.add('active');
+        navDebts.classList.remove('active');
+        debtsView.style.display = 'none';
+        dashboardView.style.display = 'block';
+        animateViewChange('right');
+        render();
+    });
+
+    navDebts.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentView === 'debts') return;
+        currentView = 'debts';
+        navDebts.classList.add('active');
+        navHome.classList.remove('active');
+        dashboardView.style.display = 'none';
+        debtsView.style.display = 'block';
+        animateViewChange('left');
+        render();
     });
 
     // Tab Switching
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            if(navigator.vibrate) navigator.vibrate(20);
-            tabBtns.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            currentTab = e.target.dataset.mainTab;
-            render();
-            updateCategoryOptions();
-        });
+    tabDrums.addEventListener('click', () => {
+        if (currentTab === 'drums') return;
+        currentTab = 'drums';
+        tabDrums.classList.add('active');
+        tabVocals.classList.remove('active');
+        animateViewChange('right');
+        render();
+    });
+
+    tabVocals.addEventListener('click', () => {
+        if (currentTab === 'vocals') return;
+        currentTab = 'vocals';
+        tabVocals.classList.add('active');
+        tabDrums.classList.remove('active');
+        animateViewChange('left');
+        render();
     });
 
     // Modal
