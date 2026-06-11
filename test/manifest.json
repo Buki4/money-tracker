@@ -1,0 +1,16 @@
+{
+  "name": "Tempo TEST",
+  "short_name": "Test",
+  "description": "Music Finance Tracker (Test Environment)",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#450a0a",
+  "theme_color": "#450a0a",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

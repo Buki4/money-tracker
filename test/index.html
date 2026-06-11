@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Tempo Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <meta name="theme-color" content="#0f172a">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="header">
+            <div class="user-info">
+                <div class="avatar">🥁</div>
+                <div>
+                    <div class="greeting">Tempo Tracker</div>
+                    <div class="month-selector">
+                        <button class="month-btn" id="prevMonthBtn">◀</button>
+                        <span id="currentMonthLabel">Июнь 2026</span>
+                        <button class="month-btn" id="nextMonthBtn">▶</button>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-btn" id="openSettingsBtn" style="cursor: pointer; font-size: 20px;">⚙️</div>
+        </header>
+
+        <!-- Category Tabs -->
+        <div class="main-tabs">
+            <button class="tab-btn active" data-main-tab="drums"><span id="tabNameDrums">Барабаны</span></button>
+            <button class="tab-btn" data-main-tab="vocals"><span id="tabNameVocals">Вокал</span></button>
+        </div>
+
+        <!-- Dashboard View -->
+        <main class="view active" id="dashboardView">
+            <!-- Balance Card -->
+            <div class="balance-card">
+                <div class="balance-title">Баланс за месяц</div>
+                <div class="balance-amount" id="totalBalance">0 €</div>
+                
+                <div class="total-overall">Общий профит: <span id="overallBalance" style="font-weight: bold;">0 €</span></div>
+                
+                <div class="balance-stats">
+                    <div class="stat income">
+                        <div class="stat-label">Доходы</div>
+                        <div class="stat-value" id="totalIncome">0 €</div>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat expense">
+                        <div class="stat-label">Расходы</div>
+                        <div class="stat-value" id="totalExpense">0 €</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="section-title">
+                <h3>Последние операции</h3>
+            </div>
+            <!-- Search -->
+            <input type="text" id="searchInput" placeholder="Поиск по заметкам и именам..." style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; color: white; margin-bottom: 16px; font-size: 14px;">
+
+            <div class="transactions-list" id="transactionsList">
+                <!-- Transactions will be injected here by JS -->
+                <div class="empty-state">Нет операций в этом месяце</div>
+            </div>
+        </main>
+
+        <!-- Debts View -->
+        <div id="debtsView" class="view">
+            <div class="section-title"><h3>Долги</h3></div>
+            <div class="balance-card" style="margin-bottom: 24px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="font-size: 14px; color: var(--text-muted);">Вам должны:</span>
+                    <span id="totalOwedToMe" style="font-weight: 600; color: var(--income);">0 €</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="font-size: 14px; color: var(--text-muted);">Вы должны:</span>
+                    <span id="totalIOwe" style="font-weight: 600; color: var(--expense);">0 €</span>
+                </div>
+            </div>
+            <div class="debts-list" id="debtsList">
+                <!-- Debts will be injected here -->
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-view="dashboardView">
+                <span class="icon">📊</span>
+                <span class="label">Главная</span>
+            </button>
+            
+            <div class="nav-item-add">
+                <button class="fab-btn" id="openAddModalBtn">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            
+            <button class="nav-item" data-view="debtsView">
+                <span class="icon">💸</span>
+                <span class="label">Долги</span>
+            </button>
+        </nav>
+
+        <!-- Add Transaction Modal -->
+        <div class="modal-overlay" id="addModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Новая запись</h3>
+                    <button class="close-modal" id="closeAddModalBtn">&times;</button>
+                </div>
+                <form id="addForm" class="add-form">
+                    
+                    <div class="form-group type-selector">
+                        <label>
+                            <input type="radio" name="type" value="income" checked>
+                            <span class="type-btn income">Доход</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="type" value="expense">
+                            <span class="type-btn expense">Расход</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="type" value="debt">
+                            <span class="type-btn debt">Долг</span>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Сумма</label>
+                        <input type="number" id="amountInput" placeholder="0" required inputmode="decimal" pattern="\d*">
+                    </div>
+
+                    <!-- Depending on type, some fields might hide/show -->
+                    <div class="form-group" id="categoryGroup">
+                        <label>Категория</label>
+                        <select id="categoryInput" required>
+                            <!-- Options populated by JS based on main-tab -->
+                            <option value="lessons">Уроки</option>
+                            <option value="rehearsal">Репетиции</option>
+                            <option value="concerts">Концерты</option>
+                            <option value="gear">Оборудование/Стафф</option>
+                            <option value="distrokid">Дистрибуция (Distrokid)</option>
+                            <option value="other">Другое</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="personGroup">
+                        <label>Имя (Ученик/Коллега)</label>
+                        <input type="text" id="personInput" placeholder="Например: Вася">
+                    </div>
+
+                    <div class="form-group debt-type-group" id="debtTypeGroup" style="display: none;">
+                        <label>Кто кому должен?</label>
+                        <select id="debtTypeInput">
+                            <option value="owed_to_me">Мне должны (Должник)</option>
+                            <option value="i_owe">Я должен (Кредитор)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Заметка</label>
+                        <input type="text" id="noteInput" placeholder="Необязательно">
+                    </div>
+
+                    <button type="submit" class="submit-btn">Добавить</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Настройки</h3>
+                    <button class="close-modal" id="closeSettingsModalBtn">&times;</button>
+                </div>
+                <div class="settings-body">
+
+                    <button id="exportCsvBtn" class="submit-btn" style="margin-top: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📄 Скачать историю (CSV)</button>
+                    
+                    <button id="exportJsonBtn" class="submit-btn" style="margin-top: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">💾 Сохранить бэкап (JSON)</button>
+                    <div style="margin-top: 12px;">
+                        <input type="file" id="importJsonInput" accept=".json" style="display: none;">
+                        <button id="importJsonBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📥 Восстановить из бэкапа</button>
+                    </div>
+                    
+                    <button id="openFeedbackBtn" class="submit-btn" style="margin-top: 12px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.5); color: #c4b5fd;">💬 Оставить отзыв / Сообщить о баге</button>
+
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 8px;">Названия вкладок</label>
+                        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                            <input type="text" id="tabNameInput1" placeholder="Вкладка 1 (Барабаны)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px; height: 42px; box-sizing: border-box;">
+                            <input type="text" id="tabNameInput2" placeholder="Вкладка 2 (Вокал)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px; height: 42px; box-sizing: border-box;">
+                        </div>
+                        <button id="saveTabNamesBtn" class="submit-btn" style="margin-top: 0; background: var(--income);">Сохранить названия</button>
+                    </div>
+
+                    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <button id="updateAppBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">🔄 Обновить версию (Текущая: <span id="currentVersionSettings">0.0</span>)</button>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">Нажми, если обновился код на сервере</p>
+                    </div>
+
+                    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <button id="wipeDataBtn" class="submit-btn" style="margin-top: 0; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: var(--expense);">⚠️ Сбросить все данные</button>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">Удалит всю историю только на этом устройстве</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Modal -->
+    <div class="modal-overlay" id="feedbackModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px; font-weight: 500;">Обратная связь</h2>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Напиши, что не работает, или предложи идею. Сообщение улетит напрямую разработчику!</p>
+            <textarea id="feedbackTextarea" placeholder="Напиши сообщение..." style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; color: white; padding: 12px; font-family: inherit; font-size: 14px; margin-bottom: 12px; resize: none;"></textarea>
+            
+            <input type="file" id="feedbackImageInput" accept="image/*" style="display: none;">
+            <button id="attachImageBtn" class="submit-btn" style="margin-top: 0; margin-bottom: 16px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: white; font-size: 13px; padding: 10px;">📎 Прикрепить скриншот</button>
+            <img id="feedbackImagePreview" style="display: none; width: 100%; border-radius: 8px; margin-bottom: 16px; max-height: 200px; object-fit: cover;">
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="closeFeedbackBtn" class="submit-btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); flex: 1;">Отмена</button>
+                <button id="sendFeedbackBtn" class="submit-btn" style="background: var(--income); flex: 1;">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div class="modal-overlay centered" id="changelogModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px; font-weight: 500;">Обновление успешно! 🎉</h2>
+            <p style="font-size: 14px; color: var(--income); margin-bottom: 12px; font-weight: 500;">Установлена версия <span id="changelogVersionSpan">0.0</span></p>
+            <div id="changelogText" style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; white-space: pre-wrap;"></div>
+            <button id="closeChangelogBtn" class="submit-btn" style="background: var(--income);">Понятно, спасибо</button>
+        </div>
+    </div>
+
+    <!-- Update Prompt Modal -->
+    <div class="modal-overlay centered" id="updatePromptModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px; font-weight: 500;">Новая версия! 🎁</h2>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Доступно свежее обновление (Версия <span id="newVersionSpan"></span>). Обновить сейчас?</p>
+            <div style="display: flex; gap: 10px;">
+                <button id="cancelUpdateBtn" class="submit-btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); flex: 1;">Позже</button>
+                <button id="confirmUpdateBtn" class="submit-btn" style="background: var(--income); flex: 1;">Обновить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+        <div id="toast" class="toast">Сообщение</div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
