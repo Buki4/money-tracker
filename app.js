@@ -27,12 +27,16 @@ const categories = {
 
 // Current active context
 let currentTab = 'drums'; // 'drums' or 'vocals'
+let currentView = 'dashboard';
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
 // DOM Elements
 const views = document.querySelectorAll('.view');
-const navItems = document.querySelectorAll('.nav-item');
+const navHome = document.querySelector('.nav-item[data-view="dashboardView"]');
+const navDebts = document.querySelector('.nav-item[data-view="debtsView"]');
+const dashboardView = document.getElementById('dashboardView');
+const debtsView = document.getElementById('debtsView');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const totalBalanceEl = document.getElementById('totalBalance');
 const overallBalanceEl = document.getElementById('overallBalance');
