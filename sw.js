@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tempo-tracker-v2';
+const CACHE_NAME = 'tempo-tracker-v3';
 const ASSETS = [
     './',
     './index.html',
@@ -30,11 +30,21 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch event - serve from cache if available, else fetch from network
+// Fetch event - Network First Strategy!
 self.addEventListener('fetch', event => {
     event.respondWith(
-        caches.match(event.request).then(response => {
-            return response || fetch(event.request);
+        fetch(event.request).then(response => {
+            // Cache the latest version if successful
+            if(response && response.status === 200 && response.type === 'basic') {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then(cache => {
+                    cache.put(event.request, responseToCache);
+                });
+            }
+            return response;
+        }).catch(() => {
+            // Fallback to cache if offline
+            return caches.match(event.request);
         })
     );
 });
