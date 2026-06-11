@@ -64,6 +64,11 @@ const copyDataBtn = document.getElementById('copyDataBtn');
 const importDataBtn = document.getElementById('importDataBtn');
 const updateAppBtn = document.getElementById('updateAppBtn');
 const exportCsvBtn = document.getElementById('exportCsvBtn');
+const openFeedbackBtn = document.getElementById('openFeedbackBtn');
+const feedbackModal = document.getElementById('feedbackModal');
+const closeFeedbackBtn = document.getElementById('closeFeedbackBtn');
+const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
+const feedbackTextarea = document.getElementById('feedbackTextarea');
 let editingTxId = null;
 
 // Toast Element
@@ -557,6 +562,43 @@ function setupEventListeners() {
         link.click();
         document.body.removeChild(link);
         showToast('CSV скачан!');
+    });
+
+    openFeedbackBtn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(30);
+        feedbackModal.classList.add('active');
+        settingsModal.classList.remove('active');
+        setTimeout(() => feedbackTextarea.focus(), 100);
+    });
+
+    closeFeedbackBtn.addEventListener('click', () => {
+        feedbackModal.classList.remove('active');
+        feedbackTextarea.value = '';
+    });
+
+    sendFeedbackBtn.addEventListener('click', async () => {
+        const text = feedbackTextarea.value.trim();
+        if (!text) return;
+        
+        if (navigator.vibrate) navigator.vibrate(30);
+        sendFeedbackBtn.textContent = 'Отправка...';
+        sendFeedbackBtn.style.opacity = '0.5';
+
+        const token = '8913559777:AAFdTyeWU91lq-kfGVVakTF66r50tfHGOpQ';
+        const chatId = '660179360';
+        const msg = encodeURIComponent(`🚨 Фидбек из Tempo Tracker:\n\n${text}`);
+
+        try {
+            await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${msg}`);
+            showToast('Отправлено! Спасибо!');
+            feedbackModal.classList.remove('active');
+            feedbackTextarea.value = '';
+        } catch (e) {
+            showToast('Ошибка отправки =(');
+        } finally {
+            sendFeedbackBtn.textContent = 'Отправить';
+            sendFeedbackBtn.style.opacity = '1';
+        }
     });
 
     // Modal Radio Buttons Logic
