@@ -38,6 +38,8 @@ const navDebts = document.querySelector('.nav-item[data-view="debtsView"]');
 const dashboardView = document.getElementById('dashboardView');
 const debtsView = document.getElementById('debtsView');
 const tabBtns = document.querySelectorAll('.tab-btn');
+const tabDrums = document.querySelector('.tab-btn[data-main-tab="drums"]');
+const tabVocals = document.querySelector('.tab-btn[data-main-tab="vocals"]');
 const totalBalanceEl = document.getElementById('totalBalance');
 const overallBalanceEl = document.getElementById('overallBalance');
 const totalIncomeEl = document.getElementById('totalIncome');
