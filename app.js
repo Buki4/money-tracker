@@ -295,6 +295,29 @@ function renderDashboard() {
         }
     });
     const overallBalance = overallIncome - overallExpense;
+    
+    // 2. Filter transactions by tab, month and search query
+    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
+    const filteredTx = state.transactions.filter(tx => {
+        const d = new Date(tx.date);
+        const matchMonth = tx.tab === currentTab && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const matchSearch = searchQuery === '' || 
+                            (tx.note && tx.note.toLowerCase().includes(searchQuery)) || 
+                            (tx.person && tx.person.toLowerCase().includes(searchQuery)) ||
+                            (tx.category && tx.category.toLowerCase().includes(searchQuery));
+        return matchMonth && matchSearch;
+    });
+
+    let income = 0;
+    let expense = 0;
+
+    filteredTx.forEach(tx => {
+        if (tx.type === 'income') income += tx.amount;
+        if (tx.type === 'expense') expense += tx.amount;
+    });
+
+    const balance = income - expense;
+    
     const formatTotal = (val) => `${val.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
     
     if (overallBalanceEl) {
