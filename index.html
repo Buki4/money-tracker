@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tempo Finance</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="header">
+            <div class="user-info">
+                <div class="avatar">🥁</div>
+                <div>
+                    <div class="greeting">Tempo Tracker</div>
+                    <div class="month-selector">
+                        <button class="month-btn" id="prevMonthBtn">◀</button>
+                        <span id="currentMonthLabel">Июнь 2026</span>
+                        <button class="month-btn" id="nextMonthBtn">▶</button>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-btn" id="openSettingsBtn" style="cursor: pointer; font-size: 20px;">⚙️</div>
+        </header>
+
+        <!-- Category Tabs (Drums / Vocals) -->
+        <div class="main-tabs">
+            <button class="tab-btn active" data-main-tab="drums">Барабаны</button>
+            <button class="tab-btn" data-main-tab="vocals">Вокал</button>
+        </div>
+
+        <!-- Dashboard View -->
+        <main class="view active" id="dashboardView">
+            
+            <!-- Balance Card -->
+            <div class="balance-card">
+                <div class="balance-title">Баланс за месяц</div>
+                <div class="balance-amount" id="totalBalance">0 €</div>
+                
+                <div class="total-overall">Общий профит: <span id="overallBalance" style="font-weight: bold;">0 €</span></div>
+                
+                <div class="balance-stats">
+                    <div class="stat income">
+                        <div class="stat-label">Доходы</div>
+                        <div class="stat-value" id="totalIncome">0 €</div>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat expense">
+                        <div class="stat-label">Расходы</div>
+                        <div class="stat-value" id="totalExpense">0 €</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="section-title">
+                <h3>Последние операции</h3>
+            </div>
+            <div class="transactions-list" id="transactionsList">
+                <!-- Transactions will be injected here by JS -->
+                <div class="empty-state">Нет операций в этом месяце</div>
+            </div>
+        </main>
+
+        <!-- Debts View -->
+        <main class="view" id="debtsView">
+            <div class="debts-container">
+                <div class="debt-section">
+                    <h3>Мне должны</h3>
+                    <div class="debts-list" id="debtsOwedToMe">
+                        <!-- Debts injected here -->
+                    </div>
+                </div>
+                <div class="debt-section">
+                    <h3>Я должен</h3>
+                    <div class="debts-list" id="debtsIOwe">
+                        <!-- Debts injected here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-view="dashboardView">
+                <span class="icon">📊</span>
+                <span class="label">Главная</span>
+            </button>
+            
+            <div class="nav-item-add">
+                <button class="fab-btn" id="openAddModalBtn">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            
+            <button class="nav-item" data-view="debtsView">
+                <span class="icon">💸</span>
+                <span class="label">Долги</span>
+            </button>
+        </nav>
+
+        <!-- Add Transaction Modal -->
+        <div class="modal-overlay" id="addModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Новая запись</h3>
+                    <button class="close-modal" id="closeAddModalBtn">&times;</button>
+                </div>
+                <form id="addForm" class="add-form">
+                    
+                    <div class="form-group type-selector">
+                        <label>
+                            <input type="radio" name="type" value="income" checked>
+                            <span class="type-btn income">Доход</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="type" value="expense">
+                            <span class="type-btn expense">Расход</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="type" value="debt">
+                            <span class="type-btn debt">Долг</span>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Сумма</label>
+                        <input type="number" id="amountInput" placeholder="0" required inputmode="decimal" pattern="\d*">
+                    </div>
+
+                    <!-- Depending on type, some fields might hide/show -->
+                    <div class="form-group" id="categoryGroup">
+                        <label>Категория</label>
+                        <select id="categoryInput" required>
+                            <!-- Options populated by JS based on main-tab -->
+                            <option value="lessons">Уроки</option>
+                            <option value="rehearsal">Репетиции</option>
+                            <option value="concerts">Концерты</option>
+                            <option value="gear">Оборудование/Стафф</option>
+                            <option value="distrokid">Дистрибуция (Distrokid)</option>
+                            <option value="other">Другое</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="personGroup">
+                        <label>Имя (Ученик/Коллега)</label>
+                        <input type="text" id="personInput" placeholder="Например: Вася">
+                    </div>
+
+                    <div class="form-group debt-type-group" id="debtTypeGroup" style="display: none;">
+                        <label>Кто кому должен?</label>
+                        <select id="debtTypeInput">
+                            <option value="owed_to_me">Мне должны (Должник)</option>
+                            <option value="i_owe">Я должен (Кредитор)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Заметка</label>
+                        <input type="text" id="noteInput" placeholder="Необязательно">
+                    </div>
+
+                    <button type="submit" class="submit-btn">Добавить</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Перенос данных</h3>
+                    <button class="close-modal" id="closeSettingsModalBtn">&times;</button>
+                </div>
+                <div class="settings-body">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+                        Чтобы открыть приложение в другом браузере или телефоне со всей историей, скопируй этот код и вставь его там же.
+                    </p>
+                    <textarea id="syncDataTextarea" rows="6" style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; margin-bottom: 16px; font-family: monospace; font-size: 11px;"></textarea>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button id="copyDataBtn" class="submit-btn" style="margin-top: 0; flex: 1;">Скопировать</button>
+                        <button id="importDataBtn" class="submit-btn" style="margin-top: 0; background: var(--income); flex: 1;">Загрузить</button>
+                    </div>
+
+                    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <button id="updateAppBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">🔄 Обновить версию приложения</button>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">Нажми, если обновился код на сервере</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast">Сообщение</div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

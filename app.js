@@ -1,0 +1,569 @@
+// State Management
+let state = {
+    transactions: [], // { id, tab, type, amount, category, person, note, date }
+    debts: [] // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
+};
+
+// Categories based on tab
+const categories = {
+    drums: [
+        { id: 'lessons', label: 'Уроки' },
+        { id: 'rehearsal', label: 'Репетиции' },
+        { id: 'concerts', label: 'Концерты' },
+        { id: 'gear', label: 'Оборудование/Стафф' },
+        { id: 'distrokid', label: 'Дистрибуция (Distrokid)' },
+        { id: 'merch', label: 'Мерч' },
+        { id: 'ads', label: 'Реклама' },
+        { id: 'other', label: 'Другое' }
+    ],
+    vocals: [
+        { id: 'lessons', label: 'Уроки' },
+        { id: 'rehearsal', label: 'Репетиции' },
+        { id: 'concerts', label: 'Концерты' },
+        { id: 'other', label: 'Другое' }
+    ]
+};
+
+// Current active context
+let currentTab = 'drums'; // 'drums' or 'vocals'
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+
+// DOM Elements
+const views = document.querySelectorAll('.view');
+const navItems = document.querySelectorAll('.nav-item');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const totalBalanceEl = document.getElementById('totalBalance');
+const overallBalanceEl = document.getElementById('overallBalance');
+const totalIncomeEl = document.getElementById('totalIncome');
+const totalExpenseEl = document.getElementById('totalExpense');
+const transactionsListEl = document.getElementById('transactionsList');
+const debtsOwedToMeEl = document.getElementById('debtsOwedToMe');
+const debtsIOweEl = document.getElementById('debtsIOwe');
+
+// Month Elements
+const currentMonthLabel = document.getElementById('currentMonthLabel');
+const prevMonthBtn = document.getElementById('prevMonthBtn');
+const nextMonthBtn = document.getElementById('nextMonthBtn');
+
+// Modal Elements
+const addModal = document.getElementById('addModal');
+const openAddModalBtn = document.getElementById('openAddModalBtn');
+const closeAddModalBtn = document.getElementById('closeAddModalBtn');
+const addForm = document.getElementById('addForm');
+const categoryGroup = document.getElementById('categoryGroup');
+const categoryInput = document.getElementById('categoryInput');
+const debtTypeGroup = document.getElementById('debtTypeGroup');
+const typeRadios = document.querySelectorAll('input[name="type"]');
+
+// Settings Elements
+const settingsModal = document.getElementById('settingsModal');
+const openSettingsBtn = document.getElementById('openSettingsBtn');
+const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
+const syncDataTextarea = document.getElementById('syncDataTextarea');
+const copyDataBtn = document.getElementById('copyDataBtn');
+const importDataBtn = document.getElementById('importDataBtn');
+const updateAppBtn = document.getElementById('updateAppBtn');
+
+// Toast Element
+const toastEl = document.getElementById('toast');
+
+// Initialization
+function init() {
+    loadData();
+    setupEventListeners();
+    updateMonthLabel();
+    render();
+
+    // Register Service Worker for Offline Support
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker registered', reg))
+                .catch(err => console.error('Service Worker registration failed', err));
+        });
+    }
+}
+
+const SEED_TRANSACTIONS = [
+    // 2025 Drums
+    { tab: 'drums', type: 'expense', amount: 5838, category: 'other', note: 'Расходы 2025', date: '2025-12-01T12:00:00Z' },
+    { tab: 'drums', type: 'income', amount: 26, category: 'concerts', note: '37-21', date: '2025-12-01T12:00:00Z' },
+    { tab: 'drums', type: 'income', amount: 550, category: 'lessons', date: '2025-12-01T12:00:00Z' },
+    { tab: 'drums', type: 'income', amount: 280, category: 'gear', note: 'Продажа оборудования', date: '2025-12-01T12:00:00Z' },
+    // 2025 Vocals
+    { tab: 'vocals', type: 'expense', amount: 90, category: 'other', date: '2025-12-01T12:00:00Z' },
+    { tab: 'vocals', type: 'expense', amount: 155, category: 'other', date: '2025-12-01T12:00:00Z' },
+    { tab: 'vocals', type: 'expense', amount: 42, category: 'other', date: '2025-12-01T12:00:00Z' },
+    // 2026 Jan-Feb
+    { tab: 'drums', type: 'expense', amount: 25, category: 'distrokid', date: '2026-02-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 70, category: 'rehearsal', date: '2026-02-15T12:00:00Z' },
+    { tab: 'drums', type: 'income', amount: 500, category: 'lessons', date: '2026-02-15T12:00:00Z' },
+    // 2026 March
+    { tab: 'drums', type: 'income', amount: 730, category: 'lessons', date: '2026-03-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 41, category: 'gear', date: '2026-03-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 295, category: 'gear', date: '2026-03-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 155, category: 'gear', date: '2026-03-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 42, category: 'gear', date: '2026-03-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 20, category: 'other', note: 'Мастер класс', date: '2026-03-15T12:00:00Z' },
+    // 2026 April
+    { tab: 'drums', type: 'income', amount: 800, category: 'lessons', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 72.5, category: 'rehearsal', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 90, category: 'concerts', note: 'GFEST', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 10, category: 'distrokid', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'income', amount: 10, category: 'other', person: 'Ира', note: 'Бонус', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 34, category: 'merch', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 20, category: 'other', note: 'Temu', date: '2026-04-15T12:00:00Z' },
+    { tab: 'drums', type: 'expense', amount: 30, category: 'ads', note: 'Реклама', date: '2026-04-15T12:00:00Z' },
+    // 2026 May
+    { tab: 'drums', type: 'expense', amount: 37.5, category: 'rehearsal', date: '2026-05-15T12:00:00Z' },
+    { tab: 'drums', type: 'income', amount: 900, category: 'lessons', date: '2026-05-15T12:00:00Z' }
+].map((t, i) => ({ ...t, id: 'seed-' + i }));
+
+const SEED_DEBTS = [];
+
+function loadData() {
+    const saved = localStorage.getItem('tempoTrackerData');
+    if (saved) {
+        state = JSON.parse(saved);
+    }
+    
+    // Inject missing seed data to ensure it always loads
+    let modified = false;
+    
+    // One-time cleanup for June 2026
+    if (!localStorage.getItem('june_cleaned_2026')) {
+        state.transactions = state.transactions.filter(tx => {
+            const d = new Date(tx.date);
+            return !(d.getMonth() === 5 && d.getFullYear() === 2026); // 5 is June
+        });
+        state.debts = state.debts.filter(d => {
+            const dDate = new Date(d.date);
+            return !(dDate.getMonth() === 5 && dDate.getFullYear() === 2026);
+        });
+        localStorage.setItem('june_cleaned_2026', 'true');
+        modified = true;
+    }
+
+    SEED_TRANSACTIONS.forEach(seedTx => {
+        if (!state.transactions.find(tx => tx.id === seedTx.id)) {
+            state.transactions.push(seedTx);
+            modified = true;
+        }
+    });
+    
+    SEED_DEBTS.forEach(seedDebt => {
+        if (!state.debts.find(d => d.id === seedDebt.id)) {
+            state.debts.push(seedDebt);
+            modified = true;
+        }
+    });
+
+    if (modified) {
+        saveData();
+    }
+}
+
+function saveData() {
+    localStorage.setItem('tempoTrackerData', JSON.stringify(state));
+}
+
+function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (navigator.vibrate) navigator.vibrate(50);
+    setTimeout(() => toastEl.classList.remove('show'), 2500);
+}
+
+// Render Functions
+function render() {
+    renderDashboard();
+    renderDebts();
+}
+
+function renderDashboard() {
+    // 1. Calculate overall balance for the current tab
+    let overallIncome = 0;
+    let overallExpense = 0;
+    
+    state.transactions.forEach(tx => {
+        if (tx.tab === currentTab) {
+            if (tx.type === 'income') overallIncome += tx.amount;
+            if (tx.type === 'expense') overallExpense += tx.amount;
+        }
+    });
+    
+    const overallBalance = overallIncome - overallExpense;
+    overallBalanceEl.textContent = `${overallBalance.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+    overallBalanceEl.style.color = overallBalance >= 0 ? 'var(--income)' : 'var(--expense)';
+
+    // 2. Filter transactions by tab and current month
+    const filteredTx = state.transactions.filter(tx => {
+        const d = new Date(tx.date);
+        return tx.tab === currentTab && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    let income = 0;
+    let expense = 0;
+
+    filteredTx.forEach(tx => {
+        if (tx.type === 'income') income += tx.amount;
+        if (tx.type === 'expense') expense += tx.amount;
+    });
+
+    const balance = income - expense;
+
+    totalBalanceEl.textContent = `${balance.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+    totalIncomeEl.textContent = `${income.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+    totalExpenseEl.textContent = `${expense.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+
+    // Render list
+    transactionsListEl.innerHTML = '';
+    if (filteredTx.length === 0) {
+        transactionsListEl.innerHTML = '<div class="empty-state">Нет операций в этом месяце</div>';
+    } else {
+        // Sort by date desc
+        filteredTx.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        let currentDateGroup = null;
+        
+        filteredTx.forEach(tx => {
+            const txDateObj = new Date(tx.date);
+            const dateStr = txDateObj.toLocaleDateString('ru-RU');
+            
+            // Check for Today/Yesterday
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            let dateLabel = dateStr;
+            if (dateStr === today.toLocaleDateString('ru-RU')) dateLabel = 'Сегодня';
+            else if (dateStr === yesterday.toLocaleDateString('ru-RU')) dateLabel = 'Вчера';
+            
+            if (dateLabel !== currentDateGroup) {
+                const header = document.createElement('div');
+                header.className = 'date-header';
+                header.textContent = dateLabel;
+                transactionsListEl.appendChild(header);
+                currentDateGroup = dateLabel;
+            }
+
+            const catLabel = categories[tx.tab].find(c => c.id === tx.category)?.label || tx.category;
+            const sign = tx.type === 'income' ? '+' : '-';
+            const cls = tx.type === 'income' ? 'income' : 'expense';
+            const personStr = tx.person ? ` • ${tx.person}` : '';
+            
+            const el = document.createElement('div');
+            el.className = 'transaction-item';
+            el.innerHTML = `
+                <div class="tx-info">
+                    <div class="tx-category">${catLabel}</div>
+                    <div class="tx-person">${personStr.replace(' • ', '')}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="tx-amount ${cls}">${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</div>
+                    <button class="delete-btn" onclick="deleteTransaction('${tx.id}')">✕</button>
+                </div>
+            `;
+            transactionsListEl.appendChild(el);
+        });
+    }
+}
+
+function renderDebts() {
+    const filteredDebts = state.debts.filter(d => d.tab === currentTab);
+    
+    const owedToMe = filteredDebts.filter(d => d.type === 'owed_to_me');
+    const iOwe = filteredDebts.filter(d => d.type === 'i_owe');
+
+    renderDebtList(debtsOwedToMeEl, owedToMe, 'owed');
+    renderDebtList(debtsIOweEl, iOwe, 'i-owe');
+}
+
+function renderDebtList(container, list, amtClass) {
+    container.innerHTML = '';
+    if (list.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет долгов</div>';
+        return;
+    }
+
+    list.forEach(debt => {
+        const el = document.createElement('div');
+        el.className = 'debt-item';
+        el.innerHTML = `
+            <div>
+                <div class="person">${debt.person || 'Неизвестно'}</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="pay-btn" onclick="payDebt('${debt.id}')">Погасить</button>
+                    <button class="pay-btn" style="color: var(--expense); border-color: rgba(239, 68, 68, 0.3);" onclick="deleteDebt('${debt.id}')">Удалить</button>
+                </div>
+            </div>
+            <div class="amount ${amtClass}">${debt.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</div>
+        `;
+        container.appendChild(el);
+    });
+}
+
+window.deleteTransaction = function(id) {
+    if(confirm('Удалить эту запись?')) {
+        state.transactions = state.transactions.filter(tx => tx.id !== id);
+        saveData();
+        render();
+        showToast('Запись удалена');
+    }
+};
+
+window.deleteDebt = function(id) {
+    if(confirm('Удалить этот долг?')) {
+        state.debts = state.debts.filter(d => d.id !== id);
+        saveData();
+        render();
+        showToast('Долг удален');
+    }
+};
+
+window.payDebt = function(id) {
+    const debtIndex = state.debts.findIndex(d => d.id === id);
+    if (debtIndex === -1) return;
+    
+    const debt = state.debts[debtIndex];
+    
+    // Create transaction to offset
+    const txType = debt.type === 'owed_to_me' ? 'income' : 'expense';
+    state.transactions.push({
+        id: Date.now().toString(),
+        tab: debt.tab,
+        type: txType,
+        amount: debt.amount,
+        category: 'other',
+        person: debt.person,
+        note: 'Погашение долга',
+        date: new Date().toISOString()
+    });
+
+    // Remove debt
+    state.debts.splice(debtIndex, 1);
+    
+    saveData();
+    render();
+    showToast('Долг погашен!');
+};
+
+// Event Listeners
+function setupEventListeners() {
+    // Month Switcher
+    prevMonthBtn.addEventListener('click', () => {
+        currentMonth--;
+        if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+        }
+        updateMonthLabel();
+        render();
+    });
+
+    nextMonthBtn.addEventListener('click', () => {
+        currentMonth++;
+        if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        }
+        updateMonthLabel();
+        render();
+    });
+
+    // Bottom Nav
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            navItems.forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+            
+            const viewId = item.getAttribute('data-view');
+            views.forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        });
+    });
+
+    // Main Tabs (Drums / Vocals)
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTab = btn.getAttribute('data-main-tab');
+            render();
+            updateCategoryOptions();
+        });
+    });
+
+    // Modal
+    openAddModalBtn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(50);
+        addModal.classList.add('active');
+        updateCategoryOptions();
+        
+        // Load last used type and category
+        const lastType = localStorage.getItem('lastAddType') || 'income';
+        const lastCategory = localStorage.getItem('lastAddCategory');
+        
+        const typeInput = document.querySelector(`input[name="type"][value="${lastType}"]`);
+        if (typeInput) typeInput.checked = true;
+        toggleFormFields(lastType);
+        
+        if (lastCategory && lastType !== 'debt') {
+            categoryInput.value = lastCategory;
+        }
+
+        setTimeout(() => document.getElementById('amountInput').focus(), 100);
+    });
+
+    closeAddModalBtn.addEventListener('click', () => {
+        addModal.classList.remove('active');
+        addForm.reset();
+        toggleFormFields('income');
+    });
+
+    // Settings Modal
+    openSettingsBtn.addEventListener('click', () => {
+        syncDataTextarea.value = JSON.stringify(state);
+        settingsModal.classList.add('active');
+    });
+
+    closeSettingsModalBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('active');
+    });
+
+    copyDataBtn.addEventListener('click', () => {
+        syncDataTextarea.select();
+        document.execCommand('copy');
+        copyDataBtn.textContent = 'Скопировано!';
+        setTimeout(() => copyDataBtn.textContent = 'Скопировать', 2000);
+    });
+
+    importDataBtn.addEventListener('click', () => {
+        try {
+            const parsed = JSON.parse(syncDataTextarea.value);
+            if (parsed && parsed.transactions && parsed.debts) {
+                state = parsed;
+                saveData();
+                render();
+                settingsModal.classList.remove('active');
+                showToast('Данные загружены!');
+            } else {
+                showToast('Неверный формат');
+            }
+        } catch (e) {
+            showToast('Ошибка чтения');
+        }
+    });
+
+    updateAppBtn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(50);
+        showToast('Обновление...');
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+        }
+        caches.keys().then(keys => {
+            return Promise.all(keys.map(key => caches.delete(key)));
+        }).then(() => {
+            setTimeout(() => window.location.reload(true), 500);
+        });
+    });
+
+    // Modal Radio Buttons Logic
+    typeRadios.forEach(r => {
+        r.addEventListener('change', (e) => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            toggleFormFields(e.target.value);
+        });
+    });
+
+    // Form Submit
+    addForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+        const type = document.querySelector('input[name="type"]:checked').value;
+        const amount = parseFloat(document.getElementById('amountInput').value);
+        const person = document.getElementById('personInput').value.trim();
+        const note = document.getElementById('noteInput').value.trim();
+        
+        // Save memory
+        localStorage.setItem('lastAddType', type);
+        if (type !== 'debt') {
+            localStorage.setItem('lastAddCategory', document.getElementById('categoryInput').value);
+        }
+        
+        // Always save with today's date in current month for simplicity, 
+        // or we could save to the currently selected month. Let's save to currently selected month/year.
+        const dateObj = new Date();
+        dateObj.setFullYear(currentYear);
+        dateObj.setMonth(currentMonth);
+
+        if (type === 'debt') {
+            const debtType = document.getElementById('debtTypeInput').value;
+            state.debts.push({
+                id: Date.now().toString(),
+                tab: currentTab,
+                type: debtType,
+                amount,
+                person,
+                note,
+                date: dateObj.toISOString()
+            });
+        } else {
+            const category = document.getElementById('categoryInput').value;
+            state.transactions.push({
+                id: Date.now().toString(),
+                tab: currentTab,
+                type,
+                amount,
+                category,
+                person,
+                note,
+                date: dateObj.toISOString()
+            });
+        }
+
+        saveData();
+        render();
+        
+        showToast('Успешно добавлено');
+        
+        addModal.classList.remove('active');
+        addForm.reset();
+        toggleFormFields('income');
+    });
+}
+
+function updateCategoryOptions() {
+    categoryInput.innerHTML = '';
+    categories[currentTab].forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat.id;
+        opt.textContent = cat.label;
+        categoryInput.appendChild(opt);
+    });
+}
+
+function toggleFormFields(type) {
+    if (type === 'debt') {
+        categoryGroup.style.display = 'none';
+        debtTypeGroup.style.display = 'block';
+    } else {
+        categoryGroup.style.display = 'block';
+        debtTypeGroup.style.display = 'none';
+    }
+}
+
+function updateMonthLabel() {
+    const months = ['Янв', 'Фев', 'Март', 'Апр', 'Май', 'Июнь', 'Июль', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+    currentMonthLabel.textContent = `${months[currentMonth]} ${currentYear}`;
+}
+
+// Start
+init();
