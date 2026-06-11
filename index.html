@@ -215,7 +215,11 @@
         <div class="modal-content">
             <h2 style="margin-bottom: 20px; font-weight: 500;">Обратная связь</h2>
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Напиши, что не работает, или предложи идею. Сообщение улетит напрямую разработчику!</p>
-            <textarea id="feedbackTextarea" placeholder="Напиши сообщение..." style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; color: white; padding: 12px; font-family: inherit; font-size: 14px; margin-bottom: 20px; resize: none;"></textarea>
+            <textarea id="feedbackTextarea" placeholder="Напиши сообщение..." style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; color: white; padding: 12px; font-family: inherit; font-size: 14px; margin-bottom: 12px; resize: none;"></textarea>
+            
+            <input type="file" id="feedbackImageInput" accept="image/*" style="display: none;">
+            <button id="attachImageBtn" class="submit-btn" style="margin-top: 0; margin-bottom: 16px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: white; font-size: 13px; padding: 10px;">📎 Прикрепить скриншот</button>
+            <img id="feedbackImagePreview" style="display: none; width: 100%; border-radius: 8px; margin-bottom: 16px; max-height: 200px; object-fit: cover;">
             
             <div style="display: flex; gap: 10px;">
                 <button id="closeFeedbackBtn" class="submit-btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); flex: 1;">Отмена</button>

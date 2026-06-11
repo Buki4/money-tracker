@@ -68,6 +68,9 @@ const feedbackModal = document.getElementById('feedbackModal');
 const closeFeedbackBtn = document.getElementById('closeFeedbackBtn');
 const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
 const feedbackTextarea = document.getElementById('feedbackTextarea');
+const feedbackImageInput = document.getElementById('feedbackImageInput');
+const attachImageBtn = document.getElementById('attachImageBtn');
+const feedbackImagePreview = document.getElementById('feedbackImagePreview');
 const changelogModal = document.getElementById('changelogModal');
 const changelogText = document.getElementById('changelogText');
 const closeChangelogBtn = document.getElementById('closeChangelogBtn');
@@ -667,15 +670,37 @@ function setupEventListeners() {
     closeFeedbackBtn.addEventListener('click', () => {
         feedbackModal.classList.remove('active');
         feedbackTextarea.value = '';
+        feedbackImageInput.value = '';
+        feedbackImagePreview.src = '';
+        feedbackImagePreview.style.display = 'none';
+        attachImageBtn.style.display = 'block';
     });
     
     closeChangelogBtn.addEventListener('click', () => {
         changelogModal.classList.remove('active');
     });
 
+    attachImageBtn.addEventListener('click', () => {
+        feedbackImageInput.click();
+    });
+
+    feedbackImageInput.addEventListener('change', () => {
+        const file = feedbackImageInput.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                feedbackImagePreview.src = e.target.result;
+                feedbackImagePreview.style.display = 'block';
+                attachImageBtn.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
     sendFeedbackBtn.addEventListener('click', async () => {
         const text = feedbackTextarea.value.trim();
-        if (!text) return;
+        const file = feedbackImageInput.files[0];
+        if (!text && !file) return;
         
         if (navigator.vibrate) navigator.vibrate(30);
         sendFeedbackBtn.textContent = 'Отправка...';
@@ -683,13 +708,30 @@ function setupEventListeners() {
 
         const token = '8913559777:AAFdTyeWU91lq-kfGVVakTF66r50tfHGOpQ';
         const chatId = '660179360';
-        const msg = encodeURIComponent(`🚨 Фидбек из Tempo Tracker:\n\n${text}`);
+        const caption = `🚨 Фидбек из Tempo Tracker:\n\n${text}`;
 
         try {
-            await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${msg}`);
+            if (file) {
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('caption', caption);
+                formData.append('photo', file);
+                
+                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+            } else {
+                const msg = encodeURIComponent(caption);
+                await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${msg}`);
+            }
             showToast('Отправлено! Спасибо!');
             feedbackModal.classList.remove('active');
             feedbackTextarea.value = '';
+            feedbackImageInput.value = '';
+            feedbackImagePreview.src = '';
+            feedbackImagePreview.style.display = 'none';
+            attachImageBtn.style.display = 'block';
         } catch (e) {
             showToast('Ошибка отправки =(');
         } finally {
