@@ -32,7 +32,7 @@ let currentYear = new Date().getFullYear();
 // DOM Elements
 const views = document.querySelectorAll('.view');
 const navItems = document.querySelectorAll('.nav-item');
-const tabBtns = document.querySelectorAll('.tab-btn');
+const tabBtns = document.querySelectorAll('.tab');
 const totalBalanceEl = document.getElementById('totalBalance');
 const overallBalanceEl = document.getElementById('overallBalance');
 const totalIncomeEl = document.getElementById('totalIncome');
@@ -64,6 +64,9 @@ const syncDataTextarea = document.getElementById('syncDataTextarea');
 const copyDataBtn = document.getElementById('copyDataBtn');
 const importDataBtn = document.getElementById('importDataBtn');
 const updateAppBtn = document.getElementById('updateAppBtn');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const installGuideBtn = document.getElementById('installGuideBtn');
+let editingTxId = null;
 
 // Toast Element
 const toastEl = document.getElementById('toast');
@@ -217,6 +220,11 @@ function renderDashboard() {
     totalIncomeEl.textContent = `${income.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
     totalExpenseEl.textContent = `${expense.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
 
+    const summaryEl = document.getElementById('monthlySummary');
+    if (summaryEl) {
+        summaryEl.textContent = `В этом месяце: +${income.toLocaleString('ru-RU')} € / -${expense.toLocaleString('ru-RU')} €`;
+    }
+
     // Render list
     transactionsListEl.innerHTML = '';
     if (filteredTx.length === 0) {
@@ -256,12 +264,12 @@ function renderDashboard() {
             const el = document.createElement('div');
             el.className = 'transaction-item';
             el.innerHTML = `
-                <div class="tx-info">
-                    <div class="tx-category">${catLabel}</div>
+                <div class="tx-info" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
+                    <div class="tx-category">${catLabel} <span style="font-size: 10px; opacity: 0.5; margin-left: 4px;">✏️</span></div>
                     <div class="tx-person">${personStr.replace(' • ', '')}</div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <div class="tx-amount ${cls}">${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</div>
+                    <div class="tx-amount ${cls}" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</div>
                     <button class="delete-btn" onclick="deleteTransaction('${tx.id}')">✕</button>
                 </div>
             `;
@@ -303,6 +311,30 @@ function renderDebtList(container, list, amtClass) {
         container.appendChild(el);
     });
 }
+
+window.editTransaction = function(id) {
+    if (navigator.vibrate) navigator.vibrate(30);
+    const tx = state.transactions.find(t => t.id === id);
+    if (!tx) return;
+    
+    editingTxId = id;
+    addModal.classList.add('active');
+    updateCategoryOptions();
+    
+    const typeInput = document.querySelector(`input[name="type"][value="${tx.type}"]`);
+    if (typeInput) typeInput.checked = true;
+    toggleFormFields(tx.type);
+    
+    document.getElementById('amountInput').value = tx.amount;
+    if (tx.type !== 'debt') {
+        categoryInput.value = tx.category;
+    }
+    document.getElementById('personInput').value = tx.person || '';
+    document.getElementById('noteInput').value = tx.note || '';
+    
+    const btn = addForm.querySelector('button[type="submit"]');
+    if(btn) btn.textContent = 'Сохранить изменения';
+};
 
 window.deleteTransaction = function(id) {
     if(confirm('Удалить эту запись?')) {
@@ -351,6 +383,38 @@ window.payDebt = function(id) {
 
 // Event Listeners
 function setupEventListeners() {
+    // Swipe gestures
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    document.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, {passive: true});
+
+    document.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, {passive: true});
+
+    function handleSwipe() {
+        if (addModal.classList.contains('active') || settingsModal.classList.contains('active')) return;
+        
+        // swipe left
+        if (touchEndX < touchStartX - 70) {
+            if (currentTab === 'drums') {
+                const vocalsTab = document.querySelector('.tab[data-tab="vocals"]');
+                if (vocalsTab) vocalsTab.click();
+            }
+        }
+        // swipe right
+        if (touchEndX > touchStartX + 70) {
+            if (currentTab === 'vocals') {
+                const drumsTab = document.querySelector('.tab[data-tab="drums"]');
+                if (drumsTab) drumsTab.click();
+            }
+        }
+    }
+
     // Month Switcher
     prevMonthBtn.addEventListener('click', () => {
         currentMonth--;
@@ -387,9 +451,10 @@ function setupEventListeners() {
     // Main Tabs (Drums / Vocals)
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            if (navigator.vibrate) navigator.vibrate(20);
             tabBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            currentTab = btn.getAttribute('data-main-tab');
+            currentTab = btn.getAttribute('data-tab');
             render();
             updateCategoryOptions();
         });
@@ -420,6 +485,9 @@ function setupEventListeners() {
         addModal.classList.remove('active');
         addForm.reset();
         toggleFormFields('income');
+        editingTxId = null;
+        const btn = addForm.querySelector('button[type="submit"]');
+        if(btn) btn.textContent = 'Добавить';
     });
 
     // Settings Modal
@@ -473,6 +541,33 @@ function setupEventListeners() {
         });
     });
 
+    exportCsvBtn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(30);
+        let csvContent = "data:text/csv;charset=utf-8,ID,Tab,Type,Amount,Category,Person,Note,Date\n";
+        state.transactions.forEach(tx => {
+            let row = [tx.id, tx.tab, tx.type, tx.amount, tx.category, tx.person || '', tx.note || '', tx.date].join(",");
+            csvContent += row + "\r\n";
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "tempo_finance_history.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('CSV скачан!');
+    });
+
+    installGuideBtn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(30);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+            alert('На iPhone:\n1. Нажми кнопку "Поделиться" (квадрат со стрелочкой) внизу экрана.\n2. Выбери "На экран Домой" (Add to Home Screen).');
+        } else {
+            alert('На Android:\n1. Нажми кнопку "Меню" (три точки) в правом верхнем углу.\n2. Выбери "Добавить на главный экран".');
+        }
+    });
+
     // Modal Radio Buttons Logic
     typeRadios.forEach(r => {
         r.addEventListener('change', (e) => {
@@ -504,35 +599,53 @@ function setupEventListeners() {
         dateObj.setFullYear(currentYear);
         dateObj.setMonth(currentMonth);
 
-        if (type === 'debt') {
-            const debtType = document.getElementById('debtTypeInput').value;
-            state.debts.push({
-                id: Date.now().toString(),
-                tab: currentTab,
-                type: debtType,
-                amount,
-                person,
-                note,
-                date: dateObj.toISOString()
-            });
+        if (editingTxId) {
+            const txIndex = state.transactions.findIndex(t => t.id === editingTxId);
+            if (txIndex !== -1) {
+                state.transactions[txIndex] = {
+                    ...state.transactions[txIndex],
+                    tab: currentTab,
+                    type,
+                    amount,
+                    person,
+                    note,
+                    category: type === 'debt' ? 'other' : categoryInput.value
+                };
+            }
+            editingTxId = null;
+            const btn = addForm.querySelector('button[type="submit"]');
+            if(btn) btn.textContent = 'Добавить';
+            showToast('Изменения сохранены');
         } else {
-            const category = document.getElementById('categoryInput').value;
-            state.transactions.push({
-                id: Date.now().toString(),
-                tab: currentTab,
-                type,
-                amount,
-                category,
-                person,
-                note,
-                date: dateObj.toISOString()
-            });
+            if (type === 'debt') {
+                const debtType = document.getElementById('debtTypeInput').value;
+                state.debts.push({
+                    id: Date.now().toString(),
+                    tab: currentTab,
+                    type: debtType,
+                    amount,
+                    person,
+                    note,
+                    date: dateObj.toISOString()
+                });
+            } else {
+                const category = document.getElementById('categoryInput').value;
+                state.transactions.push({
+                    id: Date.now().toString(),
+                    tab: currentTab,
+                    type,
+                    amount,
+                    category,
+                    person,
+                    note,
+                    date: dateObj.toISOString()
+                });
+            }
+            showToast('Успешно добавлено');
         }
 
         saveData();
         render();
-        
-        showToast('Успешно добавлено');
         
         addModal.classList.remove('active');
         addForm.reset();

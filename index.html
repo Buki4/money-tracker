@@ -44,6 +44,7 @@
             <div class="balance-card">
                 <div class="balance-title">Баланс за месяц</div>
                 <div class="balance-amount" id="totalBalance">0 €</div>
+                <div id="monthlySummary" style="font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 500;">В этом месяце: +0 € / -0 €</div>
                 
                 <div class="total-overall">Общий профит: <span id="overallBalance" style="font-weight: bold;">0 €</span></div>
                 
@@ -190,6 +191,9 @@
                         <button id="copyDataBtn" class="submit-btn" style="margin-top: 0; flex: 1;">Скопировать</button>
                         <button id="importDataBtn" class="submit-btn" style="margin-top: 0; background: var(--income); flex: 1;">Загрузить</button>
                     </div>
+
+                    <button id="exportCsvBtn" class="submit-btn" style="margin-top: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📄 Скачать историю (CSV)</button>
+                    <button id="installGuideBtn" class="submit-btn" style="margin-top: 8px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📱 Как установить на экран?</button>
 
                     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
                         <button id="updateAppBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">🔄 Обновить версию приложения</button>
