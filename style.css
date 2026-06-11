@@ -243,15 +243,16 @@ body {
     bottom: 0;
     left: 0;
     width: 100%;
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--glass-border);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: space-around;
     align-items: center;
     padding-top: 16px;
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); /* for iPhone and Android nav bars */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 10px)); /* for iPhone and Android nav bars */
 }
 
 .nav-item {
@@ -318,7 +319,7 @@ body {
     background: var(--bg-card-solid);
     border-top-left-radius: 24px;
     border-top-right-radius: 24px;
-    padding: 24px 20px 40px;
+    padding: 24px 20px calc(40px + env(safe-area-inset-bottom, 20px));
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

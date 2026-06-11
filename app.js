@@ -1,7 +1,8 @@
 // State Management
 let state = {
     transactions: [], // { id, tab, type, amount, category, person, note, date }
-    debts: [] // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
+    debts: [], // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
+    tabNames: { drums: 'Барабаны', vocals: 'Вокал' }
 };
 
 // Categories based on tab
@@ -78,6 +79,14 @@ const totalIOwe = document.getElementById('totalIOwe');
 const updatePromptModal = document.getElementById('updatePromptModal');
 const cancelUpdateBtn = document.getElementById('cancelUpdateBtn');
 const confirmUpdateBtn = document.getElementById('confirmUpdateBtn');
+const tabNameInput1 = document.getElementById('tabNameInput1');
+const tabNameInput2 = document.getElementById('tabNameInput2');
+const saveTabNamesBtn = document.getElementById('saveTabNamesBtn');
+const wipeDataBtn = document.getElementById('wipeDataBtn');
+const tabNameDrums = document.getElementById('tabNameDrums');
+const tabNameVocals = document.getElementById('tabNameVocals');
+const currentVersionSettings = document.getElementById('currentVersionSettings');
+const changelogVersionSpan = document.getElementById('changelogVersionSpan');
 let pendingUpdateData = null;
 let editingTxId = null;
 
@@ -93,6 +102,10 @@ function init() {
     
     checkChangelog();
     checkForUpdates();
+    
+    if(currentVersionSettings) {
+        currentVersionSettings.textContent = localStorage.getItem('appVersion') || '0.0';
+    }
 
     // Register Service Worker for Offline Support
     if ('serviceWorker' in navigator) {
@@ -107,6 +120,7 @@ function init() {
 function checkChangelog() {
     const pendingChangelog = localStorage.getItem('pendingChangelog');
     if (pendingChangelog) {
+        if(changelogVersionSpan) changelogVersionSpan.textContent = localStorage.getItem('appVersion') || '0.0';
         changelogText.textContent = pendingChangelog;
         changelogModal.classList.add('active');
         localStorage.removeItem('pendingChangelog');
@@ -176,7 +190,12 @@ const SEED_DEBTS = [];
 function loadData() {
     const saved = localStorage.getItem('tempoTrackerData');
     if (saved) {
-        state = JSON.parse(saved);
+        try {
+            const parsed = JSON.parse(saved);
+            state.transactions = parsed.transactions || [];
+            state.debts = parsed.debts || [];
+            state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
+        } catch(e) { console.error(e); }
     }
     
     // Inject missing seed data to ensure it always loads
@@ -214,6 +233,9 @@ function showToast(msg) {
 
 // Render Functions
 function render() {
+    if(tabNameDrums) tabNameDrums.textContent = state.tabNames.drums || 'Барабаны';
+    if(tabNameVocals) tabNameVocals.textContent = state.tabNames.vocals || 'Вокал';
+    
     renderDashboard();
     renderDebts();
 }
@@ -570,6 +592,8 @@ function setupEventListeners() {
     // Settings Modal
     openSettingsBtn.addEventListener('click', () => {
         syncDataTextarea.value = JSON.stringify(state);
+        tabNameInput1.value = state.tabNames.drums || '';
+        tabNameInput2.value = state.tabNames.vocals || '';
         settingsModal.classList.add('active');
     });
 
@@ -633,6 +657,27 @@ function setupEventListeners() {
         link.click();
         document.body.removeChild(link);
         showToast('CSV скачан!');
+    });
+
+    saveTabNamesBtn.addEventListener('click', () => {
+        if(navigator.vibrate) navigator.vibrate(30);
+        if(!state.tabNames) state.tabNames = {};
+        state.tabNames.drums = tabNameInput1.value.trim() || 'Барабаны';
+        state.tabNames.vocals = tabNameInput2.value.trim() || 'Вокал';
+        saveData();
+        render();
+        showToast('Названия сохранены');
+    });
+
+    wipeDataBtn.addEventListener('click', () => {
+        if(confirm('⚠️ ВНИМАНИЕ! Это удалит абсолютно всю историю НА ЭТОМ УСТРОЙСТВЕ без возможности восстановления!\n\nВы уверены?')) {
+            state.transactions = [];
+            state.debts = [];
+            saveData();
+            render();
+            settingsModal.classList.remove('active');
+            showToast('Все данные удалены');
+        }
     });
 
     openFeedbackBtn.addEventListener('click', () => {

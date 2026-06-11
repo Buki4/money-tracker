@@ -31,10 +31,10 @@
             <div class="settings-btn" id="openSettingsBtn" style="cursor: pointer; font-size: 20px;">⚙️</div>
         </header>
 
-        <!-- Category Tabs (Drums / Vocals) -->
+        <!-- Category Tabs -->
         <div class="main-tabs">
-            <button class="tab-btn active" data-main-tab="drums">Барабаны</button>
-            <button class="tab-btn" data-main-tab="vocals">Вокал</button>
+            <button class="tab-btn active" data-main-tab="drums"><span id="tabNameDrums">Барабаны</span></button>
+            <button class="tab-btn" data-main-tab="vocals"><span id="tabNameVocals">Вокал</span></button>
         </div>
 
         <!-- Dashboard View -->
@@ -197,9 +197,23 @@
                     
                     <button id="openFeedbackBtn" class="submit-btn" style="margin-top: 12px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.5); color: #c4b5fd;">💬 Оставить отзыв / Сообщить о баге</button>
 
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 8px;">Названия вкладок</label>
+                        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                            <input type="text" id="tabNameInput1" placeholder="Вкладка 1 (Барабаны)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px;">
+                            <input type="text" id="tabNameInput2" placeholder="Вкладка 2 (Вокал)" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: white; border-radius: 8px; padding: 10px; font-size: 13px;">
+                        </div>
+                        <button id="saveTabNamesBtn" class="submit-btn" style="margin-top: 0; background: var(--income);">Сохранить названия</button>
+                    </div>
+
                     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
-                        <button id="updateAppBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">🔄 Обновить версию приложения</button>
+                        <button id="updateAppBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">🔄 Обновить версию (Текущая: <span id="currentVersionSettings">0.0</span>)</button>
                         <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">Нажми, если обновился код на сервере</p>
+                    </div>
+
+                    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <button id="wipeDataBtn" class="submit-btn" style="margin-top: 0; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: var(--expense);">⚠️ Сбросить все данные</button>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">Удалит всю историю только на этом устройстве</p>
                     </div>
                 </div>
             </div>
@@ -223,6 +237,7 @@
     <div class="modal-overlay centered" id="changelogModal">
         <div class="modal-content">
             <h2 style="margin-bottom: 20px; font-weight: 500;">Обновление успешно! 🎉</h2>
+            <p style="font-size: 14px; color: var(--income); margin-bottom: 12px; font-weight: 500;">Установлена версия <span id="changelogVersionSpan">0.0</span></p>
             <div id="changelogText" style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; white-space: pre-wrap;"></div>
             <button id="closeChangelogBtn" class="submit-btn" style="background: var(--income);">Понятно, спасибо</button>
         </div>
