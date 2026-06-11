@@ -125,7 +125,7 @@ async function checkForUpdates() {
         
         const currentVersion = localStorage.getItem('appVersion') || '0.0';
         
-        if (parseFloat(data.version) > parseFloat(currentVersion)) {
+        if (data.version !== currentVersion) {
             pendingUpdateData = data;
             const span = document.getElementById('newVersionSpan');
             if (span) span.textContent = data.version;
