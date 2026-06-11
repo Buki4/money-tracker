@@ -72,6 +72,13 @@ const feedbackTextarea = document.getElementById('feedbackTextarea');
 const changelogModal = document.getElementById('changelogModal');
 const changelogText = document.getElementById('changelogText');
 const closeChangelogBtn = document.getElementById('closeChangelogBtn');
+const searchInput = document.getElementById('searchInput');
+const totalOwedToMe = document.getElementById('totalOwedToMe');
+const totalIOwe = document.getElementById('totalIOwe');
+const updatePromptModal = document.getElementById('updatePromptModal');
+const cancelUpdateBtn = document.getElementById('cancelUpdateBtn');
+const confirmUpdateBtn = document.getElementById('confirmUpdateBtn');
+let pendingUpdateData = null;
 let editingTxId = null;
 
 // Toast Element
@@ -119,19 +126,10 @@ async function checkForUpdates() {
         const currentVersion = localStorage.getItem('appVersion') || '0.0';
         
         if (parseFloat(data.version) > parseFloat(currentVersion)) {
-            localStorage.setItem('appVersion', data.version);
-            localStorage.setItem('pendingChangelog', data.changelog);
-            
-            if ('serviceWorker' in navigator) {
-                const regs = await navigator.serviceWorker.getRegistrations();
-                for (let reg of regs) {
-                    await reg.unregister();
-                }
-            }
-            const keys = await caches.keys();
-            await Promise.all(keys.map(key => caches.delete(key)));
-            
-            window.location.reload(true);
+            pendingUpdateData = data;
+            const span = document.getElementById('newVersionSpan');
+            if (span) span.textContent = data.version;
+            if (updatePromptModal) updatePromptModal.classList.add('active');
         }
     } catch(e) {
         console.error('Update check failed', e);
@@ -250,10 +248,14 @@ function renderDashboard() {
     overallBalanceEl.textContent = `${overallBalance.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
     overallBalanceEl.style.color = overallBalance >= 0 ? 'var(--income)' : 'var(--expense)';
 
-    // 2. Filter transactions by tab and current month
+    // 2. Filter transactions by tab, month and search query
+    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
     const filteredTx = state.transactions.filter(tx => {
         const d = new Date(tx.date);
-        return tx.tab === currentTab && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const matchMonth = tx.tab === currentTab && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const matchSearch = (tx.note && tx.note.toLowerCase().includes(searchQuery)) || 
+                            (tx.person && tx.person.toLowerCase().includes(searchQuery));
+        return matchMonth && matchSearch;
     });
 
     let income = 0;
@@ -308,6 +310,7 @@ function renderDashboard() {
             
             const el = document.createElement('div');
             el.className = 'transaction-item';
+            el.id = `tx-${tx.id}`;
             el.innerHTML = `
                 <div class="tx-info" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
                     <div class="tx-category">${catLabel} <span style="font-size: 10px; opacity: 0.5; margin-left: 4px;">✏️</span></div>
@@ -324,37 +327,50 @@ function renderDashboard() {
 }
 
 function renderDebts() {
+    const debtsListEl = document.getElementById('debtsList');
+    if (!debtsListEl) return;
+    debtsListEl.innerHTML = '';
+    
     const filteredDebts = state.debts.filter(d => d.tab === currentTab);
     
-    const owedToMe = filteredDebts.filter(d => d.type === 'owed_to_me');
-    const iOwe = filteredDebts.filter(d => d.type === 'i_owe');
+    let owedSum = 0;
+    let iOweSum = 0;
 
-    renderDebtList(debtsOwedToMeEl, owedToMe, 'owed');
-    renderDebtList(debtsIOweEl, iOwe, 'i-owe');
-}
+    if (filteredDebts.length === 0) {
+        debtsListEl.innerHTML = '<div class="empty-state">Нет долгов</div>';
+    } else {
+        filteredDebts.forEach(debt => {
+            if (debt.type === 'owed_to_me') owedSum += debt.amount;
+            else iOweSum += debt.amount;
+            
+            const isOwedToMe = debt.type === 'owed_to_me';
+            const cls = isOwedToMe ? 'owed' : 'i-owe';
+            const sign = isOwedToMe ? '+' : '-';
+            const label = isOwedToMe ? 'Мне должны' : 'Я должен';
 
-function renderDebtList(container, list, amtClass) {
-    container.innerHTML = '';
-    if (list.length === 0) {
-        container.innerHTML = '<div class="empty-state">Нет долгов</div>';
-        return;
-    }
-
-    list.forEach(debt => {
-        const el = document.createElement('div');
-        el.className = 'debt-item';
-        el.innerHTML = `
-            <div>
-                <div class="person">${debt.person || 'Неизвестно'}</div>
-                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <button class="pay-btn" onclick="payDebt('${debt.id}')">Погасить</button>
-                    <button class="pay-btn" style="color: var(--expense); border-color: rgba(239, 68, 68, 0.3);" onclick="deleteDebt('${debt.id}')">Удалить</button>
+            const el = document.createElement('div');
+            el.className = 'debt-item';
+            el.id = `debt-${debt.id}`;
+            el.innerHTML = `
+                <div style="flex:1;">
+                    <div class="person">${debt.person || 'Неизвестно'}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${label}</div>
+                    ${debt.note ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${debt.note}</div>` : ''}
                 </div>
-            </div>
-            <div class="amount ${amtClass}">${debt.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</div>
-        `;
-        container.appendChild(el);
-    });
+                <div style="display: flex; align-items: flex-end; flex-direction: column; gap: 8px;">
+                    <div class="amount ${cls}">${sign}${debt.amount.toLocaleString('ru-RU')} €</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="pay-btn" onclick="payDebt('${debt.id}')">Вернули</button>
+                        <button class="pay-btn" style="color: var(--expense); border-color: rgba(239, 68, 68, 0.3);" onclick="deleteDebt('${debt.id}')">Удалить</button>
+                    </div>
+                </div>
+            `;
+            debtsListEl.appendChild(el);
+        });
+    }
+    
+    if(totalOwedToMe) totalOwedToMe.textContent = owedSum.toLocaleString('ru-RU') + ' €';
+    if(totalIOwe) totalIOwe.textContent = iOweSum.toLocaleString('ru-RU') + ' €';
 }
 
 window.editTransaction = function(id) {
@@ -383,19 +399,39 @@ window.editTransaction = function(id) {
 
 window.deleteTransaction = function(id) {
     if(confirm('Удалить эту запись?')) {
-        state.transactions = state.transactions.filter(tx => tx.id !== id);
-        saveData();
-        render();
-        showToast('Запись удалена');
+        const el = document.getElementById(`tx-${id}`);
+        if(el) {
+            el.classList.add('item-exiting');
+            setTimeout(() => {
+                state.transactions = state.transactions.filter(tx => tx.id !== id);
+                saveData();
+                render();
+            }, 300);
+        } else {
+            state.transactions = state.transactions.filter(tx => tx.id !== id);
+            saveData();
+            render();
+        }
     }
 };
 
 window.deleteDebt = function(id) {
     if(confirm('Удалить этот долг?')) {
-        state.debts = state.debts.filter(d => d.id !== id);
-        saveData();
-        render();
-        showToast('Долг удален');
+        const el = document.getElementById(`debt-${id}`);
+        if(el) {
+            el.classList.add('item-exiting');
+            setTimeout(() => {
+                state.debts = state.debts.filter(d => d.id !== id);
+                saveData();
+                render();
+                showToast('Долг удален');
+            }, 300);
+        } else {
+            state.debts = state.debts.filter(d => d.id !== id);
+            saveData();
+            render();
+            showToast('Долг удален');
+        }
     }
 };
 
@@ -428,6 +464,10 @@ window.payDebt = function(id) {
 
 // Event Listeners
 function setupEventListeners() {
+    if (searchInput) {
+        searchInput.addEventListener('input', render);
+    }
+    
     // Swipe gestures
     let touchStartX = 0;
     let touchEndX = 0;
@@ -650,6 +690,29 @@ function setupEventListeners() {
             sendFeedbackBtn.textContent = 'Отправить';
             sendFeedbackBtn.style.opacity = '1';
         }
+    });
+
+    cancelUpdateBtn.addEventListener('click', () => {
+        updatePromptModal.classList.remove('active');
+    });
+
+    confirmUpdateBtn.addEventListener('click', async () => {
+        confirmUpdateBtn.textContent = 'Обновление...';
+        confirmUpdateBtn.style.opacity = '0.5';
+        
+        localStorage.setItem('appVersion', pendingUpdateData.version);
+        localStorage.setItem('pendingChangelog', pendingUpdateData.changelog);
+        
+        if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (let reg of regs) {
+                await reg.unregister();
+            }
+        }
+        const keys = await caches.keys();
+        await Promise.all(keys.map(key => caches.delete(key)));
+        
+        window.location.reload(true);
     });
 
     // Modal Radio Buttons Logic

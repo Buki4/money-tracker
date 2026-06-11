@@ -39,7 +39,6 @@
 
         <!-- Dashboard View -->
         <main class="view active" id="dashboardView">
-            
             <!-- Balance Card -->
             <div class="balance-card">
                 <div class="balance-title">Баланс за месяц</div>
@@ -64,6 +63,9 @@
             <div class="section-title">
                 <h3>Последние операции</h3>
             </div>
+            <!-- Search -->
+            <input type="text" id="searchInput" placeholder="Поиск по заметкам и именам..." style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; color: white; margin-bottom: 16px; font-size: 14px;">
+
             <div class="transactions-list" id="transactionsList">
                 <!-- Transactions will be injected here by JS -->
                 <div class="empty-state">Нет операций в этом месяце</div>
@@ -71,22 +73,22 @@
         </main>
 
         <!-- Debts View -->
-        <main class="view" id="debtsView">
-            <div class="debts-container">
-                <div class="debt-section">
-                    <h3>Мне должны</h3>
-                    <div class="debts-list" id="debtsOwedToMe">
-                        <!-- Debts injected here -->
-                    </div>
+        <div id="debtsView" class="view">
+            <div class="section-title"><h3>Долги</h3></div>
+            <div class="balance-card" style="margin-bottom: 24px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="font-size: 14px; color: var(--text-muted);">Вам должны:</span>
+                    <span id="totalOwedToMe" style="font-weight: 600; color: var(--income);">0 €</span>
                 </div>
-                <div class="debt-section">
-                    <h3>Я должен</h3>
-                    <div class="debts-list" id="debtsIOwe">
-                        <!-- Debts injected here -->
-                    </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="font-size: 14px; color: var(--text-muted);">Вы должны:</span>
+                    <span id="totalIOwe" style="font-weight: 600; color: var(--expense);">0 €</span>
                 </div>
             </div>
-        </main>
+            <div class="debts-list" id="debtsList">
+                <!-- Debts will be injected here -->
+            </div>
+        </div>
 
         <!-- Bottom Navigation -->
         <nav class="bottom-nav">
@@ -223,6 +225,18 @@
             <h2 style="margin-bottom: 20px; font-weight: 500;">Обновление успешно! 🎉</h2>
             <div id="changelogText" style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; white-space: pre-wrap;"></div>
             <button id="closeChangelogBtn" class="submit-btn" style="background: var(--income);">Понятно, спасибо</button>
+        </div>
+    </div>
+
+    <!-- Update Prompt Modal -->
+    <div class="modal-overlay" id="updatePromptModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px; font-weight: 500;">Новая версия! 🎁</h2>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Доступно свежее обновление (Версия <span id="newVersionSpan"></span>). Обновить сейчас?</p>
+            <div style="display: flex; gap: 10px;">
+                <button id="cancelUpdateBtn" class="submit-btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); flex: 1;">Позже</button>
+                <button id="confirmUpdateBtn" class="submit-btn" style="background: var(--income); flex: 1;">Обновить</button>
+            </div>
         </div>
     </div>
 
