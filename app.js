@@ -239,8 +239,10 @@ function renderDashboard() {
     const filteredTx = state.transactions.filter(tx => {
         const d = new Date(tx.date);
         const matchMonth = tx.tab === currentTab && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-        const matchSearch = (tx.note && tx.note.toLowerCase().includes(searchQuery)) || 
-                            (tx.person && tx.person.toLowerCase().includes(searchQuery));
+        const matchSearch = searchQuery === '' || 
+                            (tx.note && tx.note.toLowerCase().includes(searchQuery)) || 
+                            (tx.person && tx.person.toLowerCase().includes(searchQuery)) ||
+                            (tx.category && tx.category.toLowerCase().includes(searchQuery));
         return matchMonth && matchSearch;
     });
 
