@@ -69,6 +69,9 @@ const feedbackModal = document.getElementById('feedbackModal');
 const closeFeedbackBtn = document.getElementById('closeFeedbackBtn');
 const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
 const feedbackTextarea = document.getElementById('feedbackTextarea');
+const changelogModal = document.getElementById('changelogModal');
+const changelogText = document.getElementById('changelogText');
+const closeChangelogBtn = document.getElementById('closeChangelogBtn');
 let editingTxId = null;
 
 // Toast Element
@@ -80,6 +83,9 @@ function init() {
     setupEventListeners();
     updateMonthLabel();
     render();
+    
+    checkChangelog();
+    checkForUpdates();
 
     // Register Service Worker for Offline Support
     if ('serviceWorker' in navigator) {
@@ -88,6 +94,47 @@ function init() {
                 .then(reg => console.log('Service Worker registered', reg))
                 .catch(err => console.error('Service Worker registration failed', err));
         });
+    }
+}
+
+function checkChangelog() {
+    const pendingChangelog = localStorage.getItem('pendingChangelog');
+    if (pendingChangelog) {
+        changelogText.textContent = pendingChangelog;
+        changelogModal.classList.add('active');
+        localStorage.removeItem('pendingChangelog');
+    }
+    
+    if (!localStorage.getItem('appVersion')) {
+        localStorage.setItem('appVersion', '0.0');
+    }
+}
+
+async function checkForUpdates() {
+    try {
+        const res = await fetch('./version.json?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const currentVersion = localStorage.getItem('appVersion') || '0.0';
+        
+        if (parseFloat(data.version) > parseFloat(currentVersion)) {
+            localStorage.setItem('appVersion', data.version);
+            localStorage.setItem('pendingChangelog', data.changelog);
+            
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (let reg of regs) {
+                    await reg.unregister();
+                }
+            }
+            const keys = await caches.keys();
+            await Promise.all(keys.map(key => caches.delete(key)));
+            
+            window.location.reload(true);
+        }
+    } catch(e) {
+        console.error('Update check failed', e);
     }
 }
 
@@ -574,6 +621,10 @@ function setupEventListeners() {
     closeFeedbackBtn.addEventListener('click', () => {
         feedbackModal.classList.remove('active');
         feedbackTextarea.value = '';
+    });
+    
+    closeChangelogBtn.addEventListener('click', () => {
+        changelogModal.classList.remove('active');
     });
 
     sendFeedbackBtn.addEventListener('click', async () => {
