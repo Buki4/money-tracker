@@ -32,7 +32,7 @@ let currentYear = new Date().getFullYear();
 // DOM Elements
 const views = document.querySelectorAll('.view');
 const navItems = document.querySelectorAll('.nav-item');
-const tabBtns = document.querySelectorAll('.tab');
+const tabBtns = document.querySelectorAll('.tab-btn');
 const totalBalanceEl = document.getElementById('totalBalance');
 const overallBalanceEl = document.getElementById('overallBalance');
 const totalIncomeEl = document.getElementById('totalIncome');
@@ -492,18 +492,14 @@ function setupEventListeners() {
         const diffY = touchStartY - touchEndY;
         
         if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
-            if (diffX > 0) {
-                // swiped left
-                if (currentTab === 'drums') {
-                    const vocalsTab = document.querySelector('.tab[data-tab="vocals"]');
-                    if (vocalsTab) vocalsTab.click();
-                }
-            } else {
-                // swiped right
-                if (currentTab === 'vocals') {
-                    const drumsTab = document.querySelector('.tab[data-tab="drums"]');
-                    if (drumsTab) drumsTab.click();
-                }
+            if (diffX > 0 && currentTab === 'drums') {
+                // Swiped left, go to vocals
+                const vocalsTab = document.querySelector('.tab-btn[data-main-tab="vocals"]');
+                if(vocalsTab) vocalsTab.click();
+            } else if (diffX < 0 && currentTab === 'vocals') {
+                // Swiped right, go to drums
+                const drumsTab = document.querySelector('.tab-btn[data-main-tab="drums"]');
+                if(drumsTab) drumsTab.click();
             }
         }
     }
@@ -541,13 +537,13 @@ function setupEventListeners() {
         });
     });
 
-    // Main Tabs (Drums / Vocals)
+    // Tab Switching
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (navigator.vibrate) navigator.vibrate(20);
+        btn.addEventListener('click', (e) => {
+            if(navigator.vibrate) navigator.vibrate(20);
             tabBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentTab = btn.getAttribute('data-tab');
+            e.target.classList.add('active');
+            currentTab = e.target.dataset.mainTab;
             render();
             updateCategoryOptions();
         });
