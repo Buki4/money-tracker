@@ -181,20 +181,6 @@ function loadData() {
     
     // Inject missing seed data to ensure it always loads
     let modified = false;
-    
-    // One-time cleanup for June 2026
-    if (!localStorage.getItem('june_cleaned_2026')) {
-        state.transactions = state.transactions.filter(tx => {
-            const d = new Date(tx.date);
-            return !(d.getMonth() === 5 && d.getFullYear() === 2026); // 5 is June
-        });
-        state.debts = state.debts.filter(d => {
-            const dDate = new Date(d.date);
-            return !(dDate.getMonth() === 5 && dDate.getFullYear() === 2026);
-        });
-        localStorage.setItem('june_cleaned_2026', 'true');
-        modified = true;
-    }
 
     SEED_TRANSACTIONS.forEach(seedTx => {
         if (!state.transactions.find(tx => tx.id === seedTx.id)) {
@@ -708,7 +694,7 @@ function setupEventListeners() {
         const keys = await caches.keys();
         await Promise.all(keys.map(key => caches.delete(key)));
         
-        window.location.reload(true);
+        window.location.href = window.location.pathname + '?v=' + Date.now();
     });
 
     // Modal Radio Buttons Logic
