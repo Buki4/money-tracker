@@ -60,8 +60,6 @@ const typeRadios = document.querySelectorAll('input[name="type"]');
 const settingsModal = document.getElementById('settingsModal');
 const openSettingsBtn = document.getElementById('openSettingsBtn');
 const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
-const syncDataTextarea = document.getElementById('syncDataTextarea');
-const copyDataBtn = document.getElementById('copyDataBtn');
 const importDataBtn = document.getElementById('importDataBtn');
 const updateAppBtn = document.getElementById('updateAppBtn');
 const exportCsvBtn = document.getElementById('exportCsvBtn');
@@ -139,6 +137,10 @@ async function checkForUpdates() {
         
         const currentVersion = localStorage.getItem('appVersion') || '0.0';
         
+        if(currentVersionSettings && data.version) {
+            currentVersionSettings.textContent = data.version;
+        }
+
         if (data.version !== currentVersion) {
             pendingUpdateData = data;
             const span = document.getElementById('newVersionSpan');
@@ -591,7 +593,6 @@ function setupEventListeners() {
 
     // Settings Modal
     openSettingsBtn.addEventListener('click', () => {
-        syncDataTextarea.value = JSON.stringify(state);
         tabNameInput1.value = state.tabNames.drums || '';
         tabNameInput2.value = state.tabNames.vocals || '';
         settingsModal.classList.add('active');
@@ -599,30 +600,6 @@ function setupEventListeners() {
 
     closeSettingsModalBtn.addEventListener('click', () => {
         settingsModal.classList.remove('active');
-    });
-
-    copyDataBtn.addEventListener('click', () => {
-        syncDataTextarea.select();
-        document.execCommand('copy');
-        copyDataBtn.textContent = 'Скопировано!';
-        setTimeout(() => copyDataBtn.textContent = 'Скопировать', 2000);
-    });
-
-    importDataBtn.addEventListener('click', () => {
-        try {
-            const parsed = JSON.parse(syncDataTextarea.value);
-            if (parsed && parsed.transactions && parsed.debts) {
-                state = parsed;
-                saveData();
-                render();
-                settingsModal.classList.remove('active');
-                showToast('Данные загружены!');
-            } else {
-                showToast('Неверный формат');
-            }
-        } catch (e) {
-            showToast('Ошибка чтения');
-        }
     });
 
     updateAppBtn.addEventListener('click', () => {
