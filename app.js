@@ -294,13 +294,13 @@ function renderDashboard() {
             if (tx.type === 'expense') overallExpense += tx.amount;
         }
     });
-    
+    const overallBalance = overallIncome - overallExpense;
     const formatTotal = (val) => `${val.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
-    const formatProfit = (val) => `Общий профит: <span style="color: ${val >= 0 ? 'var(--income)' : 'var(--expense)'}">${val > 0 ? '+' : ''}${formatTotal(val)}</span>`;
     
-    if (overallBalanceEl) overallBalanceEl.innerHTML = formatProfit(overallBalance);
-    // Note: overallBalance is handled differently in HTML, let's just update the value directly without animation for profit
-    
+    if (overallBalanceEl) {
+        overallBalanceEl.textContent = `${overallBalance > 0 ? '+' : ''}${formatTotal(overallBalance)}`;
+        overallBalanceEl.style.color = overallBalance >= 0 ? 'var(--income)' : 'var(--expense)';
+    }
     animateValue(totalBalanceEl, prevStats.balance, balance, 600, formatTotal);
     animateValue(totalIncomeEl, prevStats.income, income, 600, formatTotal);
     animateValue(totalExpenseEl, prevStats.expense, expense, 600, formatTotal);
