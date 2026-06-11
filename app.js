@@ -56,7 +56,6 @@ const categoryInput = document.getElementById('categoryInput');
 const debtTypeGroup = document.getElementById('debtTypeGroup');
 const typeRadios = document.querySelectorAll('input[name="type"]');
 
-// Settings Elements
 const settingsModal = document.getElementById('settingsModal');
 const openSettingsBtn = document.getElementById('openSettingsBtn');
 const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
@@ -65,7 +64,6 @@ const copyDataBtn = document.getElementById('copyDataBtn');
 const importDataBtn = document.getElementById('importDataBtn');
 const updateAppBtn = document.getElementById('updateAppBtn');
 const exportCsvBtn = document.getElementById('exportCsvBtn');
-const installGuideBtn = document.getElementById('installGuideBtn');
 let editingTxId = null;
 
 // Toast Element
@@ -219,11 +217,6 @@ function renderDashboard() {
     totalBalanceEl.textContent = `${balance.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
     totalIncomeEl.textContent = `${income.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
     totalExpenseEl.textContent = `${expense.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
-
-    const summaryEl = document.getElementById('monthlySummary');
-    if (summaryEl) {
-        summaryEl.textContent = `В этом месяце: +${income.toLocaleString('ru-RU')} € / -${expense.toLocaleString('ru-RU')} €`;
-    }
 
     // Render list
     transactionsListEl.innerHTML = '';
@@ -386,31 +379,39 @@ function setupEventListeners() {
     // Swipe gestures
     let touchStartX = 0;
     let touchEndX = 0;
+    let touchStartY = 0;
+    let touchEndY = 0;
     
     document.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
+        touchStartX = e.changedTouches[0].clientX;
+        touchStartY = e.changedTouches[0].clientY;
     }, {passive: true});
 
     document.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
+        touchEndX = e.changedTouches[0].clientX;
+        touchEndY = e.changedTouches[0].clientY;
         handleSwipe();
     }, {passive: true});
 
     function handleSwipe() {
         if (addModal.classList.contains('active') || settingsModal.classList.contains('active')) return;
         
-        // swipe left
-        if (touchEndX < touchStartX - 70) {
-            if (currentTab === 'drums') {
-                const vocalsTab = document.querySelector('.tab[data-tab="vocals"]');
-                if (vocalsTab) vocalsTab.click();
-            }
-        }
-        // swipe right
-        if (touchEndX > touchStartX + 70) {
-            if (currentTab === 'vocals') {
-                const drumsTab = document.querySelector('.tab[data-tab="drums"]');
-                if (drumsTab) drumsTab.click();
+        const diffX = touchStartX - touchEndX;
+        const diffY = touchStartY - touchEndY;
+        
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+            if (diffX > 0) {
+                // swiped left
+                if (currentTab === 'drums') {
+                    const vocalsTab = document.querySelector('.tab[data-tab="vocals"]');
+                    if (vocalsTab) vocalsTab.click();
+                }
+            } else {
+                // swiped right
+                if (currentTab === 'vocals') {
+                    const drumsTab = document.querySelector('.tab[data-tab="drums"]');
+                    if (drumsTab) drumsTab.click();
+                }
             }
         }
     }
@@ -556,16 +557,6 @@ function setupEventListeners() {
         link.click();
         document.body.removeChild(link);
         showToast('CSV скачан!');
-    });
-
-    installGuideBtn.addEventListener('click', () => {
-        if (navigator.vibrate) navigator.vibrate(30);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIOS) {
-            alert('На iPhone:\n1. Нажми кнопку "Поделиться" (квадрат со стрелочкой) внизу экрана.\n2. Выбери "На экран Домой" (Add to Home Screen).');
-        } else {
-            alert('На Android:\n1. Нажми кнопку "Меню" (три точки) в правом верхнем углу.\n2. Выбери "Добавить на главный экран".');
-        }
     });
 
     // Modal Radio Buttons Logic
