@@ -69,6 +69,9 @@ const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
 const importDataBtn = document.getElementById('importDataBtn');
 const updateAppBtn = document.getElementById('updateAppBtn');
 const exportCsvBtn = document.getElementById('exportCsvBtn');
+const exportJsonBtn = document.getElementById('exportJsonBtn');
+const importJsonBtn = document.getElementById('importJsonBtn');
+const importJsonInput = document.getElementById('importJsonInput');
 const openFeedbackBtn = document.getElementById('openFeedbackBtn');
 const feedbackModal = document.getElementById('feedbackModal');
 const closeFeedbackBtn = document.getElementById('closeFeedbackBtn');
@@ -724,6 +727,49 @@ function setupEventListeners() {
         document.body.removeChild(link);
         showToast('CSV скачан!');
     });
+
+    if(exportJsonBtn) {
+        exportJsonBtn.addEventListener('click', () => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const link = document.createElement("a");
+            link.setAttribute("href", dataStr);
+            link.setAttribute("download", "tempo_finance_backup.json");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('Бэкап сохранен!');
+        });
+    }
+
+    if(importJsonBtn && importJsonInput) {
+        importJsonBtn.addEventListener('click', () => {
+            importJsonInput.click();
+        });
+
+        importJsonInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    if(parsed && typeof parsed === 'object') {
+                        state.transactions = parsed.transactions || [];
+                        state.debts = parsed.debts || [];
+                        state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
+                        saveData();
+                        render();
+                        settingsModal.classList.remove('active');
+                        showToast('Данные восстановлены!');
+                    }
+                } catch(err) {
+                    alert('Ошибка чтения файла бэкапа!');
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
 
     saveTabNamesBtn.addEventListener('click', () => {
         if(navigator.vibrate) navigator.vibrate(30);

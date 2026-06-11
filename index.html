@@ -6,6 +6,7 @@
     <title>Tempo Tracker</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <meta name="theme-color" content="#0f172a">
     <!-- Google Fonts -->
@@ -186,6 +187,12 @@
                 <div class="settings-body">
 
                     <button id="exportCsvBtn" class="submit-btn" style="margin-top: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📄 Скачать историю (CSV)</button>
+                    
+                    <button id="exportJsonBtn" class="submit-btn" style="margin-top: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">💾 Сохранить бэкап (JSON)</button>
+                    <div style="margin-top: 12px;">
+                        <input type="file" id="importJsonInput" accept=".json" style="display: none;">
+                        <button id="importJsonBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📥 Восстановить из бэкапа</button>
+                    </div>
                     
                     <button id="openFeedbackBtn" class="submit-btn" style="margin-top: 12px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.5); color: #c4b5fd;">💬 Оставить отзыв / Сообщить о баге</button>
 
