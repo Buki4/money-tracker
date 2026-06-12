@@ -103,6 +103,52 @@ let editingTxId = null;
 // Toast Element
 const toastEl = document.getElementById('toast');
 
+// History API Modals Logic (Android Back Button Support)
+let openModals = [];
+
+function openModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.classList.add('active');
+    openModals.push(modalEl);
+    history.pushState({ modalId: modalEl.id }, '');
+}
+
+function closeModal(modalEl) {
+    if (!modalEl) return;
+    if (openModals.includes(modalEl)) {
+        history.back(); // This will trigger popstate, which closes it
+    } else {
+        modalEl.classList.remove('active'); // Fallback
+    }
+}
+
+window.addEventListener('popstate', (e) => {
+    if (openModals.length > 0) {
+        const modalToClose = openModals.pop();
+        modalToClose.classList.remove('active');
+        
+        // Cleanups specific to modals
+        if (modalToClose.id === 'addModal') {
+            if(typeof addForm !== 'undefined') addForm.reset();
+            if(typeof toggleFormFields === 'function') toggleFormFields('income');
+            editingTxId = null;
+            if(typeof addForm !== 'undefined') {
+                const btn = addForm.querySelector('button[type="submit"]');
+                if(btn) btn.textContent = 'Добавить';
+            }
+        }
+        if (modalToClose.id === 'feedbackModal') {
+            if(typeof feedbackTextarea !== 'undefined') feedbackTextarea.value = '';
+            if(typeof feedbackImageInput !== 'undefined') feedbackImageInput.value = '';
+            if(typeof feedbackImagePreview !== 'undefined') {
+                feedbackImagePreview.src = '';
+                feedbackImagePreview.style.display = 'none';
+            }
+            if(typeof attachImageBtn !== 'undefined') attachImageBtn.style.display = 'block';
+        }
+    }
+});
+
 // Initialization
 function init() {
     loadData();
@@ -132,7 +178,7 @@ function checkChangelog() {
     if (pendingChangelog) {
         if(changelogVersionSpan) changelogVersionSpan.textContent = localStorage.getItem('appVersion') || '0.0';
         changelogText.textContent = pendingChangelog;
-        changelogModal.classList.add('active');
+        openModal(changelogModal);
         localStorage.removeItem('pendingChangelog');
     }
     
@@ -157,7 +203,7 @@ async function checkForUpdates() {
             pendingUpdateData = data;
             const span = document.getElementById('newVersionSpan');
             if (span) span.textContent = data.version;
-            if (updatePromptModal) updatePromptModal.classList.add('active');
+            if (updatePromptModal) openModal(updatePromptModal);
         }
     } catch(e) {
         console.error('Update check failed', e);
@@ -454,7 +500,7 @@ window.editTransaction = function(id) {
     if (!tx) return;
     
     editingTxId = id;
-    addModal.classList.add('active');
+    openModal(addModal);
     updateCategoryOptions();
     
     const typeInput = document.querySelector(`input[name="type"][value="${tx.type}"]`);
@@ -656,7 +702,7 @@ function setupEventListeners() {
     // Modal
     openAddModalBtn.addEventListener('click', () => {
         if (navigator.vibrate) navigator.vibrate(50);
-        addModal.classList.add('active');
+        openModal(addModal);
         updateCategoryOptions();
         
         // Load last used type and category
@@ -675,7 +721,7 @@ function setupEventListeners() {
     });
 
     closeAddModalBtn.addEventListener('click', () => {
-        addModal.classList.remove('active');
+        closeModal(addModal);
         addForm.reset();
         toggleFormFields('income');
         editingTxId = null;
@@ -687,11 +733,11 @@ function setupEventListeners() {
     openSettingsBtn.addEventListener('click', () => {
         tabNameInput1.value = state.tabNames.drums || '';
         tabNameInput2.value = state.tabNames.vocals || '';
-        settingsModal.classList.add('active');
+        openModal(settingsModal);
     });
 
     closeSettingsModalBtn.addEventListener('click', () => {
-        settingsModal.classList.remove('active');
+        closeModal(settingsModal);
     });
 
     updateAppBtn.addEventListener('click', () => {
@@ -760,7 +806,7 @@ function setupEventListeners() {
                         state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
                         saveData();
                         render();
-                        settingsModal.classList.remove('active');
+                        closeModal(settingsModal);
                         showToast('Данные восстановлены!');
                     }
                 } catch(err) {
@@ -787,20 +833,20 @@ function setupEventListeners() {
             state.debts = [];
             saveData();
             render();
-            settingsModal.classList.remove('active');
+            closeModal(settingsModal);
             showToast('Все данные удалены');
         }
     });
 
     openFeedbackBtn.addEventListener('click', () => {
         if (navigator.vibrate) navigator.vibrate(30);
-        feedbackModal.classList.add('active');
-        settingsModal.classList.remove('active');
+        openModal(feedbackModal);
+        closeModal(settingsModal);
         setTimeout(() => feedbackTextarea.focus(), 100);
     });
 
     closeFeedbackBtn.addEventListener('click', () => {
-        feedbackModal.classList.remove('active');
+        closeModal(feedbackModal);
         feedbackTextarea.value = '';
         feedbackImageInput.value = '';
         feedbackImagePreview.src = '';
@@ -809,7 +855,7 @@ function setupEventListeners() {
     });
     
     closeChangelogBtn.addEventListener('click', () => {
-        changelogModal.classList.remove('active');
+        closeModal(changelogModal);
     });
 
     attachImageBtn.addEventListener('click', () => {
@@ -858,7 +904,7 @@ function setupEventListeners() {
                 await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${msg}`);
             }
             showToast('Отправлено! Спасибо!');
-            feedbackModal.classList.remove('active');
+            closeModal(feedbackModal);
             feedbackTextarea.value = '';
             feedbackImageInput.value = '';
             feedbackImagePreview.src = '';
@@ -873,7 +919,7 @@ function setupEventListeners() {
     });
 
     cancelUpdateBtn.addEventListener('click', () => {
-        updatePromptModal.classList.remove('active');
+        closeModal(updatePromptModal);
     });
 
     confirmUpdateBtn.addEventListener('click', async () => {
@@ -894,6 +940,50 @@ function setupEventListeners() {
         
         window.location.href = window.location.pathname + '?v=' + Date.now();
     });
+    // Pull to Refresh
+    let ptrStartY = 0;
+    let ptrCurrentY = 0;
+    const body = document.body;
+    let ptrIndicator = document.getElementById('ptrIndicator');
+    if (!ptrIndicator) {
+        ptrIndicator = document.createElement('div');
+        ptrIndicator.id = 'ptrIndicator';
+        ptrIndicator.innerHTML = '↻ Обновление...';
+        body.insertBefore(ptrIndicator, body.firstChild);
+    }
+    
+    document.addEventListener('touchstart', (e) => {
+        if (window.scrollY === 0) {
+            ptrStartY = e.touches[0].clientY;
+        }
+    }, {passive: true});
+
+    document.addEventListener('touchmove', (e) => {
+        if (window.scrollY === 0 && ptrStartY > 0) {
+            ptrCurrentY = e.touches[0].clientY;
+            let dy = ptrCurrentY - ptrStartY;
+            if (dy > 0 && dy < 100) {
+                ptrIndicator.style.transform = `translateY(${dy}px)`;
+                ptrIndicator.style.opacity = dy / 100;
+            }
+        }
+    }, {passive: true});
+
+    document.addEventListener('touchend', () => {
+        if (ptrCurrentY - ptrStartY > 60) {
+            if (navigator.vibrate) navigator.vibrate(50);
+            ptrIndicator.innerHTML = 'Загрузка...';
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 500);
+        } else {
+            ptrIndicator.style.transform = `translateY(0px)`;
+            ptrIndicator.style.opacity = 0;
+        }
+        ptrStartY = 0;
+        ptrCurrentY = 0;
+    });
+
 
     // Modal Radio Buttons Logic
     typeRadios.forEach(r => {
@@ -903,6 +993,19 @@ function setupEventListeners() {
         });
     });
 
+    // Format amount input with spaces
+    const amountInput = document.getElementById('amountInput');
+    if (amountInput) {
+        amountInput.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/[^\d]/g, '');
+            if (val) {
+                e.target.value = parseInt(val, 10).toLocaleString('ru-RU');
+            } else {
+                e.target.value = '';
+            }
+        });
+    }
+
     // Form Submit
     addForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -910,7 +1013,8 @@ function setupEventListeners() {
         if (navigator.vibrate) navigator.vibrate(50);
         
         const type = document.querySelector('input[name="type"]:checked').value;
-        const amount = parseFloat(document.getElementById('amountInput').value);
+        const rawAmount = document.getElementById('amountInput').value.replace(/\s/g, '').replace(/&nbsp;/g, '').replace(/\u00A0/g, '');
+        const amount = parseFloat(rawAmount);
         const person = document.getElementById('personInput').value.trim();
         const note = document.getElementById('noteInput').value.trim();
         
@@ -974,7 +1078,7 @@ function setupEventListeners() {
         saveData();
         render();
         
-        addModal.classList.remove('active');
+        closeModal(addModal);
         addForm.reset();
         toggleFormFields('income');
     });
