@@ -14,8 +14,15 @@ window.addEventListener('unhandledrejection', function(e) {
 let state = {
     transactions: [], // { id, tab, type, amount, category, person, note, date }
     debts: [], // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
-    tabNames: { drums: 'Барабаны', vocals: 'Вокал' }
+    tabNames: { drums: 'Барабаны', vocals: 'Вокал' },
+    pinCode: null
 };
+
+// PIN Code Variables
+let currentPinInput = '';
+let isSettingPin = false;
+let confirmPinStep = false;
+let firstPinEntry = '';
 
 // Categories based on tab
 const categories = {
@@ -184,6 +191,27 @@ function init() {
         currentVersionSettings.textContent = localStorage.getItem('appVersion') || '0.0';
     }
 
+    // Initialize custom categories if they don't exist
+    if (!state.categories) {
+        state.categories = JSON.parse(JSON.stringify(categories)); // fallback to hardcoded
+        saveData();
+    }
+
+    // Auto-backup snapshot (saves the state from last session before any changes)
+    const backupStr = localStorage.getItem('tempoTrackerData');
+    if (backupStr) {
+        localStorage.setItem('tempoState_autoBackup', backupStr);
+    }
+    
+    // Check if JSON backup is needed (>7 days)
+    const lastBackupStr = localStorage.getItem('lastFileBackupDate');
+    const settingsBtn = document.getElementById('openSettingsBtn');
+    if (!lastBackupStr || (Date.now() - parseInt(lastBackupStr)) > 7 * 24 * 60 * 60 * 1000) {
+        if (settingsBtn) {
+            settingsBtn.innerHTML = '⚙️<span style="position:absolute; top:8px; right:8px; width:8px; height:8px; background:red; border-radius:50%;"></span>';
+        }
+    }
+
     // Register Service Worker for Offline Support
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -305,11 +333,32 @@ function saveData() {
     localStorage.setItem('tempoTrackerData', JSON.stringify(state));
 }
 
-function showToast(msg) {
-    toastEl.textContent = msg;
+let undoTimeout = null;
+function showToast(msg, undoCallback = null) {
+    if (undoTimeout) {
+        clearTimeout(undoTimeout);
+        undoTimeout = null;
+    }
+    
+    toastEl.innerHTML = msg;
+    if (undoCallback) {
+        const btn = document.createElement('span');
+        btn.textContent = ' ОТМЕНИТЬ';
+        btn.style.color = 'var(--accent-primary)';
+        btn.style.fontWeight = 'bold';
+        btn.style.marginLeft = '15px';
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+            undoCallback();
+            toastEl.classList.remove('show');
+            if (undoTimeout) clearTimeout(undoTimeout);
+        };
+        toastEl.appendChild(btn);
+    }
+    
     toastEl.classList.add('show');
     if (navigator.vibrate) navigator.vibrate(50);
-    setTimeout(() => toastEl.classList.remove('show'), 2500);
+    undoTimeout = setTimeout(() => toastEl.classList.remove('show'), undoCallback ? 5000 : 2500);
 }
 
 let prevStats = { overallBalance: 0, balance: 0, income: 0, expense: 0 };
@@ -540,41 +589,48 @@ window.editTransaction = function(id) {
 };
 
 window.deleteTransaction = function(id) {
-    if(confirm('Удалить эту запись?')) {
+    const txIndex = state.transactions.findIndex(t => t.id === id);
+    if (txIndex > -1) {
+        const deletedTx = state.transactions[txIndex];
         const el = document.getElementById(`tx-${id}`);
-        if(el) {
-            el.classList.add('item-exiting');
-            setTimeout(() => {
-                state.transactions = state.transactions.filter(tx => tx.id !== id);
-                saveData();
-                render();
-            }, 300);
-        } else {
-            state.transactions = state.transactions.filter(tx => tx.id !== id);
+        if(el) el.classList.add('item-exiting');
+        
+        setTimeout(() => {
+            state.transactions.splice(txIndex, 1);
             saveData();
             render();
-        }
+            
+            showToast('Запись удалена', () => {
+                state.transactions.push(deletedTx);
+                state.transactions.sort((a, b) => b.date - a.date);
+                saveData();
+                render();
+            });
+        }, 300);
     }
 };
 
 window.deleteDebt = function(id) {
-    if(confirm('Удалить этот долг?')) {
+    const debtIndex = state.debts.findIndex(d => d.id === id);
+    if (debtIndex > -1) {
+        const deletedDebt = state.debts[debtIndex];
         const el = document.getElementById(`debt-${id}`);
-        if(el) {
-            el.classList.add('item-exiting');
-            setTimeout(() => {
-                state.debts = state.debts.filter(d => d.id !== id);
-                saveData();
-                render();
-                showToast('Долг удален');
-            }, 300);
-        } else {
-            state.debts = state.debts.filter(d => d.id !== id);
+        if(el) el.classList.add('item-exiting');
+        
+        setTimeout(() => {
+            state.debts.splice(debtIndex, 1);
             saveData();
             render();
-            showToast('Долг удален');
-        }
+            
+            showToast('Долг удален', () => {
+                state.debts.push(deletedDebt);
+                state.debts.sort((a, b) => b.date - a.date);
+                saveData();
+                render();
+            });
+        }, 300);
     }
+
 };
 
 window.payDebt = function(id) {
@@ -615,6 +671,37 @@ window.payDebt = function(id) {
 
 // Event Listeners
 function setupEventListeners() {
+    // Settings logic
+    const togglePinBtn = document.getElementById('togglePinBtn');
+    
+    window.updateSettingsBtn = function() {
+        if (togglePinBtn) {
+            togglePinBtn.textContent = state.pinCode ? 'Удалить ПИН-код' : 'Установить ПИН-код';
+        }
+    };
+    updateSettingsBtn();
+
+    if (togglePinBtn) {
+        togglePinBtn.addEventListener('click', () => {
+            if (state.pinCode) {
+                if(confirm('Удалить ПИН-код?')) {
+                    state.pinCode = null;
+                    saveData();
+                    updateSettingsBtn();
+                    showToast('ПИН-код удален');
+                }
+            } else {
+                isSettingPin = true;
+                confirmPinStep = false;
+                currentPinInput = '';
+                document.getElementById('pinTitle').textContent = 'Придумайте ПИН-код';
+                document.querySelectorAll('.pin-dot').forEach(d => { d.classList.remove('filled', 'error'); });
+                closeModal(document.getElementById('settingsModal'));
+                document.getElementById('pinOverlay').style.display = 'flex';
+            }
+        });
+    }
+
     if (searchInput) {
         searchInput.addEventListener('input', render);
     }
@@ -805,6 +892,9 @@ function setupEventListeners() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            localStorage.setItem('lastFileBackupDate', Date.now());
+            const settingsBtn = document.getElementById('openSettingsBtn');
+            if (settingsBtn) settingsBtn.innerHTML = '⚙️'; // Remove red dot
             showToast('Бэкап сохранен!');
         });
     }
@@ -835,6 +925,35 @@ function setupEventListeners() {
                 }
             };
             reader.readAsText(file);
+        });
+    }
+
+    const restoreAutoBackupBtn = document.getElementById('restoreAutoBackupBtn');
+    if (restoreAutoBackupBtn) {
+        restoreAutoBackupBtn.addEventListener('click', () => {
+            const backupStr = localStorage.getItem('tempoState_autoBackup');
+            if (!backupStr) {
+                alert('Скрытый авто-бэкап не найден. Возможно, вы еще не запускали приложение ранее.');
+                return;
+            }
+            if (confirm('Это перезапишет текущие данные на данные из последнего авто-бэкапа. Вы уверены?')) {
+                try {
+                    const parsed = JSON.parse(backupStr);
+                    if(parsed && typeof parsed === 'object') {
+                        state.transactions = parsed.transactions || [];
+                        state.debts = parsed.debts || [];
+                        state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
+                        state.categories = parsed.categories || categories;
+                        saveData();
+                        render();
+                        updateCategoryOptions();
+                        closeModal(document.getElementById('settingsModal'));
+                        showToast('Восстановлено из авто-бэкапа!');
+                    }
+                } catch(err) {
+                    alert('Ошибка чтения авто-бэкапа!');
+                }
+            }
         });
     }
 
@@ -1187,7 +1306,7 @@ function setupEventListeners() {
 
 function updateCategoryOptions() {
     categoryInput.innerHTML = '';
-    categories[currentTab].forEach(cat => {
+    state.categories[currentTab].forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat.id;
         opt.textContent = cat.label;
@@ -1387,6 +1506,16 @@ function parseVoiceCommand(text) {
         type = 'expense';
     }
 
+    if (category === 'other') {
+        const lowerText = text.toLowerCase();
+        for (let cat of state.categories[currentTab]) {
+            if (cat.id.startsWith('custom_') && lowerText.includes(cat.label.toLowerCase())) {
+                category = cat.id;
+                break;
+            }
+        }
+    }
+
     // Open Modal and Fill
     openModal(addModal);
     
@@ -1454,3 +1583,177 @@ function parseVoiceCommand(text) {
     
     showToast('Распознано: ' + text);
 }
+
+function initPinLogic() {
+    const pinOverlay = document.getElementById('pinOverlay');
+    const pinTitle = document.getElementById('pinTitle');
+    const dots = document.querySelectorAll('.pin-dot');
+    const numBtns = document.querySelectorAll('.num-btn[data-val]');
+    const delBtn = document.getElementById('pinDelBtn');
+    
+    if (!pinOverlay) return;
+
+    if (state.pinCode && !isSettingPin) {
+        pinOverlay.style.display = 'flex';
+        pinTitle.textContent = 'Введите ПИН-код';
+    }
+
+    function updateDots() {
+        dots.forEach((dot, i) => {
+            dot.classList.toggle('filled', i < currentPinInput.length);
+            dot.classList.remove('error');
+        });
+    }
+
+    function triggerError() {
+        if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        dots.forEach(dot => dot.classList.add('error'));
+        setTimeout(() => {
+            currentPinInput = '';
+            updateDots();
+        }, 400);
+    }
+
+    function processPin() {
+        if (currentPinInput.length !== 4) return;
+        
+        if (isSettingPin) {
+            if (!confirmPinStep) {
+                firstPinEntry = currentPinInput;
+                confirmPinStep = true;
+                currentPinInput = '';
+                pinTitle.textContent = 'Повторите ПИН-код';
+                updateDots();
+            } else {
+                if (currentPinInput === firstPinEntry) {
+                    state.pinCode = currentPinInput;
+                    saveData();
+                    isSettingPin = false;
+                    confirmPinStep = false;
+                    pinOverlay.style.display = 'none';
+                    showToast('ПИН-код установлен');
+                    const btn = document.getElementById('togglePinBtn');
+                    if (btn) btn.textContent = 'Удалить ПИН-код';
+                } else {
+                    triggerError();
+                    pinTitle.textContent = 'Не совпадает. Новый ПИН';
+                    confirmPinStep = false;
+                }
+            }
+        } else {
+            // Unlocking
+            if (currentPinInput === state.pinCode) {
+                pinOverlay.style.display = 'none';
+                currentPinInput = '';
+                updateDots();
+            } else {
+                triggerError();
+            }
+        }
+    }
+
+    numBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (currentPinInput.length < 4) {
+                currentPinInput += btn.getAttribute('data-val');
+                updateDots();
+                if (currentPinInput.length === 4) {
+                    setTimeout(processPin, 100); // delay to show dot
+                }
+            }
+        });
+    });
+
+    if (delBtn) {
+        delBtn.addEventListener('click', () => {
+            if (currentPinInput.length > 0) {
+                currentPinInput = currentPinInput.slice(0, -1);
+                updateDots();
+            }
+        });
+    }
+}
+
+// --- Category Editor Logic ---
+function initCategoryEditor() {
+    const editBtn = document.getElementById('editCategoriesBtn');
+    const modal = document.getElementById('categoriesModal');
+    const list = document.getElementById('categoriesList');
+    const input = document.getElementById('newCategoryInput');
+    const addBtn = document.getElementById('addCategoryBtn');
+    const tabBtns = document.querySelectorAll('.tab-btn[data-cat-tab]');
+    
+    let activeCatTab = 'drums';
+
+    function renderList() {
+        list.innerHTML = '';
+        state.categories[activeCatTab].forEach(cat => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
+            row.style.padding = '10px';
+            row.style.background = 'var(--glass-bg)';
+            row.style.borderRadius = '8px';
+            row.style.marginBottom = '8px';
+            
+            const label = document.createElement('span');
+            label.textContent = cat.label;
+            
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Удалить';
+            delBtn.style.background = 'transparent';
+            delBtn.style.border = 'none';
+            delBtn.style.color = 'var(--expense)';
+            delBtn.style.cursor = 'pointer';
+            
+            delBtn.onclick = () => {
+                if(confirm(`Удалить категорию "${cat.label}"?`)) {
+                    state.categories[activeCatTab] = state.categories[activeCatTab].filter(c => c.id !== cat.id);
+                    saveData();
+                    renderList();
+                    updateCategoryOptions();
+                }
+            };
+            
+            row.appendChild(label);
+            row.appendChild(delBtn);
+            list.appendChild(row);
+        });
+    }
+
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
+            closeModal(document.getElementById('settingsModal'));
+            openModal(modal);
+            renderList();
+        });
+    }
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeCatTab = btn.getAttribute('data-cat-tab');
+            renderList();
+        });
+    });
+
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            const val = input.value.trim();
+            if (!val) return;
+            const id = 'custom_' + Date.now();
+            state.categories[activeCatTab].push({ id: id, label: val });
+            saveData();
+            input.value = '';
+            renderList();
+            updateCategoryOptions();
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initPinLogic();
+    initCategoryEditor();
+});
