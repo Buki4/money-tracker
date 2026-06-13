@@ -1215,5 +1215,140 @@ function updateMonthLabel() {
     currentMonthLabel.textContent = `${months[currentMonth]} ${currentYear}`;
 }
 
-// Start
+// Initial setup
 init();
+
+// Voice Input Logic
+const voiceInputBtn = document.getElementById('voiceInputBtn');
+
+if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ru-RU';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    if (voiceInputBtn) {
+        voiceInputBtn.addEventListener('click', () => {
+            voiceInputBtn.classList.add('listening');
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+            recognition.start();
+            showToast('Говорите...');
+        });
+    }
+
+    recognition.addEventListener('result', (e) => {
+        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+        const transcript = e.results[0][0].transcript.toLowerCase();
+        parseVoiceCommand(transcript);
+    });
+
+    recognition.addEventListener('error', (e) => {
+        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+        // 'no-speech' is common if user doesn't say anything
+        if (e.error !== 'no-speech') {
+            showToast('Ошибка распознавания: ' + e.error);
+        }
+    });
+    
+    recognition.addEventListener('end', () => {
+        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+    });
+} else {
+    if (voiceInputBtn) voiceInputBtn.style.display = 'none';
+}
+
+function parseVoiceCommand(text) {
+    let type = 'expense'; // default
+    let category = 'other';
+    let amount = '';
+    let person = '';
+    let note = text;
+
+    // 1. Extract Amount
+    const amountMatch = text.match(/\d+/);
+    if (amountMatch) {
+        amount = amountMatch[0];
+        note = note.replace(amountMatch[0], '').trim();
+    }
+
+    // 2. Extract Type
+    const incomeKeywords = ['урок', 'доход', 'заработал', 'дали', 'получил', 'пришло', 'плюс', 'вернул', 'перевел'];
+    const debtKeywords = ['долг', 'занял', 'одолжил'];
+    
+    if (incomeKeywords.some(kw => text.includes(kw))) {
+        type = 'income';
+    } else if (debtKeywords.some(kw => text.includes(kw))) {
+        type = 'debt';
+    }
+
+    // 3. Extract Category
+    if (text.includes('урок') || text.includes('заняти') || text.includes('ученик')) {
+        category = 'lessons';
+        type = 'income';
+    } else if (text.includes('база') || text.includes('реп') || text.includes('аренд')) {
+        category = 'rehearsal';
+        type = 'expense';
+    } else if (text.includes('концерт') || text.includes('выступлен') || text.includes('гиг')) {
+        category = 'concerts';
+    } else if (text.includes('стафф') || text.includes('оборудовани') || text.includes('палочки') || text.includes('пластик') || text.includes('струны')) {
+        category = 'gear';
+        type = 'expense';
+    } else if (text.includes('реклам') || text.includes('таргет')) {
+        category = 'ads';
+        type = 'expense';
+    } else if (text.includes('дистро') || text.includes('релиз') || text.includes('дистрибуц')) {
+        category = 'distrokid';
+        type = 'expense';
+    } else if (text.includes('мерч') || text.includes('футболк')) {
+        category = 'merch';
+        type = 'expense';
+    }
+
+    // Open Modal and Fill
+    openModal(addModal);
+    
+    // Set Type
+    const typeRadio = document.querySelector(`input[name="type"][value="${type}"]`);
+    if (typeRadio) {
+        typeRadio.checked = true;
+        toggleFormFields(type);
+    }
+    
+    // Set Amount
+    if (amount) {
+        const amountInput = document.getElementById('amountInput');
+        amountInput.value = amount;
+        amountInput.dispatchEvent(new Event('input')); // format
+    }
+    
+    // Set Category
+    if (type !== 'debt') {
+        categoryInput.value = category;
+        toggleLessonFields();
+    }
+    
+    // Cleanup note
+    let cleanNote = note;
+    const stopWords = ['урок', 'доход', 'заработал', 'получил', 'купил', 'потратил', 'отдал', 'база', 'репа', 'минус', 'оплата', 'евро', 'рублей', 'бакс', 'за', 'на', 'мне'];
+    stopWords.forEach(w => {
+        cleanNote = cleanNote.replace(new RegExp(`\\b${w}\\b`, 'gi'), '');
+    });
+    cleanNote = cleanNote.replace(/\s+/g, ' ').trim();
+    // Capitalize first letter
+    if (cleanNote) {
+        cleanNote = cleanNote.charAt(0).toUpperCase() + cleanNote.slice(1);
+    }
+    
+    if (category === 'lessons') {
+        document.getElementById('personInput').value = cleanNote;
+        document.getElementById('noteInput').value = '';
+    } else {
+        document.getElementById('personInput').value = '';
+        document.getElementById('noteInput').value = cleanNote;
+    }
+    
+    showToast('Распознано: ' + text);
+}
