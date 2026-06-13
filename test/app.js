@@ -1,3 +1,15 @@
+// Global Error Logger for Developer QoL
+window.addEventListener('error', function(e) {
+    let logs = JSON.parse(localStorage.getItem('tempoErrorLog') || '[]');
+    logs.unshift({ time: new Date().toLocaleTimeString(), type: 'error', message: e.message, src: e.filename, line: e.lineno });
+    localStorage.setItem('tempoErrorLog', JSON.stringify(logs.slice(0, 30)));
+});
+window.addEventListener('unhandledrejection', function(e) {
+    let logs = JSON.parse(localStorage.getItem('tempoErrorLog') || '[]');
+    logs.unshift({ time: new Date().toLocaleTimeString(), type: 'promise', message: e.reason });
+    localStorage.setItem('tempoErrorLog', JSON.stringify(logs.slice(0, 30)));
+});
+
 // State Management
 let state = {
     transactions: [], // { id, tab, type, amount, category, person, note, date }
@@ -846,6 +858,22 @@ function setupEventListeners() {
             showToast('Все данные удалены');
         }
     });
+
+    const viewLogsBtn = document.getElementById('viewLogsBtn');
+    if (viewLogsBtn) {
+        viewLogsBtn.addEventListener('click', () => {
+            const logs = JSON.parse(localStorage.getItem('tempoErrorLog') || '[]');
+            if (logs.length === 0) {
+                alert('Лог ошибок пуст. Всё работает отлично! 🎉');
+            } else {
+                const logText = logs.map(l => `[${l.time}] ${l.type.toUpperCase()}: ${l.message}`).join('\n\n');
+                if (confirm('Найдено ' + logs.length + ' ошибок:\n\n' + logText + '\n\nОчистить лог?')) {
+                    localStorage.removeItem('tempoErrorLog');
+                    showToast('Лог очищен');
+                }
+            }
+        });
+    }
 
     openFeedbackBtn.addEventListener('click', () => {
         if (navigator.vibrate) navigator.vibrate(30);

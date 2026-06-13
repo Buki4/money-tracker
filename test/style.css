@@ -1,5 +1,5 @@
 :root {
-    /* Premium Dark Theme Colors */
+    /* Premium Dark Theme Colors (Default) */
     --bg-dark: #0f172a;
     --bg-card: rgba(30, 41, 59, 0.7);
     --bg-card-solid: #1e293b;
@@ -19,6 +19,33 @@
     /* Glassmorphism */
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-bg-hover: rgba(255, 255, 255, 0.2);
+    --nav-bg: rgba(15, 23, 42, 0.95);
+    --nav-border: rgba(255, 255, 255, 0.15);
+    --modal-overlay: rgba(0, 0, 0, 0.6);
+    --shadow-heavy: 0 10px 25px rgba(0, 0, 0, 0.5);
+    --input-bg: rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-dark: #f8fafc;
+        --bg-card: rgba(255, 255, 255, 0.85);
+        --bg-card-solid: #ffffff;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        
+        --glass-border: rgba(0, 0, 0, 0.1);
+        --glass-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.05);
+        --glass-bg: rgba(0, 0, 0, 0.05);
+        --glass-bg-hover: rgba(0, 0, 0, 0.1);
+        --nav-bg: rgba(255, 255, 255, 0.95);
+        --nav-border: rgba(0, 0, 0, 0.1);
+        --modal-overlay: rgba(0, 0, 0, 0.3);
+        --shadow-heavy: 0 10px 25px rgba(0, 0, 0, 0.1);
+        --input-bg: rgba(0, 0, 0, 0.03);
+    }
 }
 
 * {
@@ -92,7 +119,7 @@ body {
 }
 
 .month-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--glass-bg);
     border: none;
     border-radius: 6px;
     color: var(--text-main);
@@ -191,7 +218,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0,0,0,0.2);
+    background: var(--input-bg);
     border-radius: 16px;
     padding: 12px;
 }
@@ -244,10 +271,10 @@ body {
     bottom: 0;
     left: 0;
     width: 100%;
-    background: rgba(15, 23, 42, 0.95);
+    background: var(--nav-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 1px solid var(--nav-border);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: space-around;
@@ -297,7 +324,7 @@ body {
 .modal-overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6);
+    background: var(--modal-overlay);
     backdrop-filter: blur(5px);
     display: none;
     z-index: 100;
@@ -377,7 +404,7 @@ body {
 .form-group input[type="text"],
 .form-group select {
     width: 100%;
-    background: rgba(0,0,0,0.2);
+    background: var(--input-bg);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 14px;
@@ -411,7 +438,7 @@ body {
     text-align: center;
     padding: 10px;
     border-radius: 10px;
-    background: rgba(0,0,0,0.2);
+    background: var(--input-bg);
     border: 1px solid var(--glass-border);
     transition: 0.2s;
 }
@@ -499,7 +526,7 @@ body {
 .debt-item .amount.i-owe { color: var(--expense); }
 
 .pay-btn {
-    background: rgba(255,255,255,0.1);
+    background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     color: white;
     padding: 6px 12px;
@@ -603,7 +630,7 @@ body {
 
 /* Voice Input */
 .voice-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     border-radius: 50%;
     width: 36px;
