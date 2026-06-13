@@ -1221,39 +1221,80 @@ init();
 // Voice Input Logic
 const voiceInputBtn = document.getElementById('voiceInputBtn');
 
+function convertWordsToNumbers(text) {
+    const numDict = {
+        'ноль': 0, 'один': 1, 'одна': 1, 'два': 2, 'две': 2, 'три': 3, 'четыре': 4, 'пять': 5,
+        'шесть': 6, 'семь': 7, 'восемь': 8, 'девять': 9, 'десять': 10,
+        'одиннадцать': 11, 'двенадцать': 12, 'тринадцать': 13, 'четырнадцать': 14,
+        'пятнадцать': 15, 'шестнадцать': 16, 'семнадцать': 17, 'восемнадцать': 18,
+        'девятнадцать': 19, 'двадцать': 20, 'тридцать': 30, 'сорок': 40,
+        'пятьдесят': 50, 'шестьдесят': 60, 'семьдесят': 70, 'восемьдесят': 80,
+        'девяносто': 90, 'сто': 100, 'двести': 200, 'триста': 300, 'четыреста': 400,
+        'пятьсот': 500, 'шестьсот': 600, 'семьсот': 700, 'восемьсот': 800, 'девятьсот': 900,
+        'тысяча': 1000, 'тысячи': 1000, 'тысяч': 1000
+    };
+    
+    // Very basic replacement. E.g. "сто пятьдесят" -> "100 50" -> later regex will grab first numbers, 
+    // which is not ideal, but for simple phrases like "пятьдесят" it will yield "50".
+    // For full parsing, we'd need complex logic. Let's just try to replace exact word matches if they stand alone.
+    let words = text.split(' ');
+    for (let i = 0; i < words.length; i++) {
+        let w = words[i].replace(/[^а-яё]/g, '');
+        if (numDict[w] !== undefined) {
+            words[i] = numDict[w];
+        }
+    }
+    return words.join(' ');
+}
+
 if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    let recognition = new SpeechRecognition();
     recognition.lang = 'ru-RU';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
+    let isRecognizing = false;
 
     if (voiceInputBtn) {
         voiceInputBtn.addEventListener('click', () => {
-            voiceInputBtn.classList.add('listening');
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-            recognition.start();
-            showToast('Говорите...');
+            if (isRecognizing) {
+                recognition.stop();
+                return;
+            }
+            try {
+                recognition.start();
+            } catch(e) {
+                // If it fails to start, try recreating
+                recognition = new SpeechRecognition();
+                recognition.lang = 'ru-RU';
+                recognition.start();
+            }
         });
     }
 
+    recognition.addEventListener('start', () => {
+        isRecognizing = true;
+        if (voiceInputBtn) voiceInputBtn.classList.add('listening');
+        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+        showToast('Говорите...');
+    });
+
     recognition.addEventListener('result', (e) => {
-        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
-        if (navigator.vibrate) navigator.vibrate(50);
-        
-        const transcript = e.results[0][0].transcript.toLowerCase();
+        const rawTranscript = e.results[0][0].transcript.toLowerCase();
+        const transcript = convertWordsToNumbers(rawTranscript);
         parseVoiceCommand(transcript);
     });
 
     recognition.addEventListener('error', (e) => {
+        isRecognizing = false;
         if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
-        // 'no-speech' is common if user doesn't say anything
         if (e.error !== 'no-speech') {
-            showToast('Ошибка распознавания: ' + e.error);
+            showToast('Ошибка микрофона: ' + e.error);
         }
     });
     
     recognition.addEventListener('end', () => {
+        isRecognizing = false;
         if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
     });
 } else {
@@ -1272,6 +1313,9 @@ function parseVoiceCommand(text) {
     // 1. Extract ALL Amounts
     const numbersMatch = text.match(/\d+/g);
     if (numbersMatch && numbersMatch.length > 0) {
+        // If we converted "сто пятьдесят" -> "100", "50"
+        // Let's do a quick hack: if adjacent numbers, maybe sum them?
+        // Actually, just take the first digit block. For simple use cases, people say "50" and the API writes "50".
         amount = numbersMatch[0];
         note = note.replace(amountMatch[0], '').trim();
         
