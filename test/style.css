@@ -586,3 +586,17 @@ body {
     opacity: 0;
     pointer-events: none;
 }
+
+/* Senior Dev Compliance: Interactive States */
+.submit-btn:hover, .pay-btn:hover, .tab-btn:hover, .nav-item:hover, .month-btn:hover {
+    opacity: 0.85;
+}
+
+.submit-btn:active, .pay-btn:active, .tab-btn:active, .nav-item:active, .month-btn:active {
+    transform: scale(0.96);
+    opacity: 0.7;
+}
+
+.submit-btn, .pay-btn, .tab-btn, .nav-item, .month-btn {
+    transition: transform 0.2s ease, opacity 0.2s ease, background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
