@@ -1272,16 +1272,18 @@ if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
         if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
         if (navigator.vibrate) navigator.vibrate(50);
         
-        const rawTranscript = e.results[0][0].transcript.toLowerCase();
-        const transcript = convertWordsToNumbers(rawTranscript);
-        parseVoiceCommand(transcript);
+        try {
+            const rawTranscript = e.results[0][0].transcript.toLowerCase();
+            const transcript = convertWordsToNumbers(rawTranscript);
+            parseVoiceCommand(transcript);
+        } catch (err) {
+            showToast('JS Ошибка: ' + err.message);
+        }
     });
 
     recognition.addEventListener('error', (e) => {
         if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
-        if (e.error !== 'no-speech') {
-            showToast('Ошибка: ' + e.error);
-        }
+        showToast('Ошибка микрофона: ' + e.error);
     });
     
     recognition.addEventListener('end', () => {
