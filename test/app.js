@@ -60,6 +60,15 @@ const closeAddModalBtn = document.getElementById('closeAddModalBtn');
 const addForm = document.getElementById('addForm');
 const categoryGroup = document.getElementById('categoryGroup');
 const categoryInput = document.getElementById('categoryInput');
+
+// Lesson Calculator Elements
+const amountGroup = document.getElementById('amountGroup');
+const lessonSpecialGroup = document.getElementById('lessonSpecialGroup');
+const lessonTypeRadios = document.querySelectorAll('input[name="lessonType"]');
+const lessonRentalFields = document.getElementById('lessonRentalFields');
+const rentalGrossInput = document.getElementById('rentalGrossInput');
+const rentalCostInput = document.getElementById('rentalCostInput');
+const lessonNetResult = document.getElementById('lessonNetResult');
 const debtTypeGroup = document.getElementById('debtTypeGroup');
 const typeRadios = document.querySelectorAll('input[name="type"]');
 
@@ -1006,6 +1015,36 @@ function setupEventListeners() {
         });
     }
 
+    // Lesson Calculator Logic
+    categoryInput.addEventListener('change', toggleLessonFields);
+    
+    lessonTypeRadios.forEach(r => {
+        r.addEventListener('change', (e) => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            toggleLessonFields();
+        });
+    });
+
+    function calculateNet() {
+        const gross = parseInt(rentalGrossInput.value.replace(/\s/g, '')) || 0;
+        const cost = parseInt(rentalCostInput.value.replace(/\s/g, '')) || 0;
+        lessonNetResult.textContent = `Прибыль: ${gross - cost} €`;
+    }
+
+    [rentalGrossInput, rentalCostInput].forEach(inp => {
+        if (inp) {
+            inp.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/[^\d]/g, '');
+                if (val) {
+                    e.target.value = parseInt(val, 10).toLocaleString('ru-RU');
+                } else {
+                    e.target.value = '';
+                }
+                calculateNet();
+            });
+        }
+    });
+
     // Form Submit
     addForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -1013,34 +1052,67 @@ function setupEventListeners() {
         if (navigator.vibrate) navigator.vibrate(50);
         
         const type = document.querySelector('input[name="type"]:checked').value;
-        const rawAmount = document.getElementById('amountInput').value.replace(/\s/g, '').replace(/&nbsp;/g, '').replace(/\u00A0/g, '');
-        const amount = parseFloat(rawAmount);
+        const category = type === 'debt' ? 'other' : categoryInput.value;
         const person = document.getElementById('personInput').value.trim();
         const note = document.getElementById('noteInput').value.trim();
-        
-        // Save memory
-        localStorage.setItem('lastAddType', type);
-        if (type !== 'debt') {
-            localStorage.setItem('lastAddCategory', document.getElementById('categoryInput').value);
-        }
-        
-        // Always save with today's date in current month for simplicity, 
-        // or we could save to the currently selected month. Let's save to currently selected month/year.
         const dateObj = new Date();
         dateObj.setFullYear(currentYear);
         dateObj.setMonth(currentMonth);
 
+        // Check if Lesson Rental
+        const lessonType = document.querySelector('input[name="lessonType"]:checked')?.value;
+        const isRental = type === 'income' && category === 'lessons' && lessonType === 'rental';
+
+        let transactionsToAdd = [];
+
+        if (isRental) {
+            const gross = parseInt(rentalGrossInput.value.replace(/\s/g, '')) || 0;
+            const cost = parseInt(rentalCostInput.value.replace(/\s/g, '')) || 0;
+            
+            if (gross > 0) {
+                transactionsToAdd.push({
+                    type: 'income',
+                    amount: gross,
+                    category: 'lessons',
+                    person,
+                    note
+                });
+            }
+            if (cost > 0) {
+                transactionsToAdd.push({
+                    type: 'expense',
+                    amount: cost,
+                    category: 'rehearsal',
+                    person,
+                    note: note ? note + ' (Аренда за урок)' : 'Аренда за урок'
+                });
+            }
+        } else {
+            const rawAmount = document.getElementById('amountInput').value.replace(/\s/g, '').replace(/&nbsp;/g, '').replace(/\u00A0/g, '');
+            const amount = parseFloat(rawAmount) || 0;
+            transactionsToAdd.push({ type, amount, category, person, note });
+        }
+        
+        // Save memory
+        localStorage.setItem('lastAddType', type);
+        if (type !== 'debt') {
+            localStorage.setItem('lastAddCategory', category);
+        }
+
         if (editingTxId) {
+            // Edit only the first one if it's a rental? Actually, don't allow converting to rental during edit.
+            // Just edit the existing transaction with the first item in transactionsToAdd.
             const txIndex = state.transactions.findIndex(t => t.id === editingTxId);
-            if (txIndex !== -1) {
+            if (txIndex !== -1 && transactionsToAdd.length > 0) {
+                const txData = transactionsToAdd[0];
                 state.transactions[txIndex] = {
                     ...state.transactions[txIndex],
                     tab: currentTab,
-                    type,
-                    amount,
-                    person,
-                    note,
-                    category: type === 'debt' ? 'other' : categoryInput.value
+                    type: txData.type,
+                    amount: txData.amount,
+                    person: txData.person,
+                    note: txData.note,
+                    category: txData.category
                 };
             }
             editingTxId = null;
@@ -1048,30 +1120,31 @@ function setupEventListeners() {
             if(btn) btn.textContent = 'Добавить';
             showToast('Изменения сохранены');
         } else {
-            if (type === 'debt') {
-                const debtType = document.getElementById('debtTypeInput').value;
-                state.debts.push({
-                    id: Date.now().toString(),
-                    tab: currentTab,
-                    type: debtType,
-                    amount,
-                    person,
-                    note,
-                    date: dateObj.toISOString()
-                });
-            } else {
-                const category = document.getElementById('categoryInput').value;
-                state.transactions.push({
-                    id: Date.now().toString(),
-                    tab: currentTab,
-                    type,
-                    amount,
-                    category,
-                    person,
-                    note,
-                    date: dateObj.toISOString()
-                });
-            }
+            transactionsToAdd.forEach((txData, index) => {
+                if (txData.type === 'debt') {
+                    const debtType = document.getElementById('debtTypeInput').value;
+                    state.debts.push({
+                        id: (Date.now() + index).toString(),
+                        tab: currentTab,
+                        type: debtType,
+                        amount: txData.amount,
+                        person: txData.person,
+                        note: txData.note,
+                        date: dateObj.toISOString()
+                    });
+                } else {
+                    state.transactions.push({
+                        id: (Date.now() + index).toString(),
+                        tab: currentTab,
+                        type: txData.type,
+                        amount: txData.amount,
+                        category: txData.category,
+                        person: txData.person,
+                        note: txData.note,
+                        date: dateObj.toISOString()
+                    });
+                }
+            });
             showToast('Успешно добавлено');
         }
 
@@ -1101,6 +1174,39 @@ function toggleFormFields(type) {
     } else {
         categoryGroup.style.display = 'block';
         debtTypeGroup.style.display = 'none';
+    }
+    toggleLessonFields();
+}
+
+function toggleLessonFields() {
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const cat = categoryInput.value;
+    
+    if (type === 'income' && cat === 'lessons') {
+        lessonSpecialGroup.style.display = 'block';
+        const lessonType = document.querySelector('input[name="lessonType"]:checked').value;
+        if (lessonType === 'rental') {
+            lessonRentalFields.style.display = 'block';
+            amountGroup.style.display = 'none';
+            document.getElementById('amountInput').required = false;
+        } else {
+            lessonRentalFields.style.display = 'none';
+            amountGroup.style.display = 'block';
+            document.getElementById('amountInput').required = true;
+            
+            if (lessonType === 'school') {
+                const amountInput = document.getElementById('amountInput');
+                if (!amountInput.value) {
+                    amountInput.value = '25';
+                    // Optional: trigger input event to format
+                    amountInput.dispatchEvent(new Event('input'));
+                }
+            }
+        }
+    } else {
+        lessonSpecialGroup.style.display = 'none';
+        amountGroup.style.display = 'block';
+        document.getElementById('amountInput').required = true;
     }
 }
 
