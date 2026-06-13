@@ -1264,14 +1264,21 @@ function parseVoiceCommand(text) {
     let type = 'expense'; // default
     let category = 'other';
     let amount = '';
+    let rentalCost = '';
     let person = '';
     let note = text;
+    let lessonType = 'normal';
 
-    // 1. Extract Amount
-    const amountMatch = text.match(/\d+/);
-    if (amountMatch) {
-        amount = amountMatch[0];
+    // 1. Extract ALL Amounts
+    const numbersMatch = text.match(/\d+/g);
+    if (numbersMatch && numbersMatch.length > 0) {
+        amount = numbersMatch[0];
         note = note.replace(amountMatch[0], '').trim();
+        
+        if (numbersMatch.length > 1) {
+            rentalCost = numbersMatch[1];
+            note = note.replace(numbersMatch[1], '').trim();
+        }
     }
 
     // 2. Extract Type
@@ -1288,6 +1295,14 @@ function parseVoiceCommand(text) {
     if (text.includes('урок') || text.includes('заняти') || text.includes('ученик')) {
         category = 'lessons';
         type = 'income';
+        
+        // Detect Lesson Sub-Type
+        if (text.includes('школ')) {
+            lessonType = 'school';
+            amount = amount || '25'; // auto-fill if not mentioned
+        } else if (text.includes('аренд') || text.includes('баз')) {
+            lessonType = 'rental';
+        }
     } else if (text.includes('база') || text.includes('реп') || text.includes('аренд')) {
         category = 'rehearsal';
         type = 'expense';
@@ -1317,17 +1332,39 @@ function parseVoiceCommand(text) {
         toggleFormFields(type);
     }
     
-    // Set Amount
-    if (amount) {
-        const amountInput = document.getElementById('amountInput');
-        amountInput.value = amount;
-        amountInput.dispatchEvent(new Event('input')); // format
-    }
-    
     // Set Category
     if (type !== 'debt') {
         categoryInput.value = category;
-        toggleLessonFields();
+        toggleLessonFields(); // Make sure lessonSpecialGroup is shown if needed
+    }
+    
+    // If it's a lesson, set the sub-type radio
+    if (category === 'lessons') {
+        const lessonRadio = document.querySelector(`input[name="lessonType"][value="${lessonType}"]`);
+        if (lessonRadio) {
+            lessonRadio.checked = true;
+            toggleLessonFields(); // toggle inputs based on lessonType
+        }
+    }
+    
+    // Set Amounts
+    if (lessonType === 'rental') {
+        if (amount) {
+            const rGross = document.getElementById('rentalGrossInput');
+            rGross.value = amount;
+            rGross.dispatchEvent(new Event('input'));
+        }
+        if (rentalCost) {
+            const rCost = document.getElementById('rentalCostInput');
+            rCost.value = rentalCost;
+            rCost.dispatchEvent(new Event('input'));
+        }
+    } else {
+        if (amount) {
+            const amountInput = document.getElementById('amountInput');
+            amountInput.value = amount;
+            amountInput.dispatchEvent(new Event('input')); // format
+        }
     }
     
     // Cleanup note
