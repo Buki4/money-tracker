@@ -60,6 +60,15 @@ const closeAddModalBtn = document.getElementById('closeAddModalBtn');
 const addForm = document.getElementById('addForm');
 const categoryGroup = document.getElementById('categoryGroup');
 const categoryInput = document.getElementById('categoryInput');
+
+// Lesson Calculator Elements
+const amountGroup = document.getElementById('amountGroup');
+const lessonSpecialGroup = document.getElementById('lessonSpecialGroup');
+const lessonTypeRadios = document.querySelectorAll('input[name="lessonType"]');
+const lessonRentalFields = document.getElementById('lessonRentalFields');
+const rentalGrossInput = document.getElementById('rentalGrossInput');
+const rentalCostInput = document.getElementById('rentalCostInput');
+const lessonNetResult = document.getElementById('lessonNetResult');
 const debtTypeGroup = document.getElementById('debtTypeGroup');
 const typeRadios = document.querySelectorAll('input[name="type"]');
 
@@ -1006,6 +1015,36 @@ function setupEventListeners() {
         });
     }
 
+    // Lesson Calculator Logic
+    categoryInput.addEventListener('change', toggleLessonFields);
+    
+    lessonTypeRadios.forEach(r => {
+        r.addEventListener('change', (e) => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            toggleLessonFields();
+        });
+    });
+
+    function calculateNet() {
+        const gross = parseInt(rentalGrossInput.value.replace(/\s/g, '')) || 0;
+        const cost = parseInt(rentalCostInput.value.replace(/\s/g, '')) || 0;
+        lessonNetResult.textContent = `Прибыль: ${gross - cost} €`;
+    }
+
+    [rentalGrossInput, rentalCostInput].forEach(inp => {
+        if (inp) {
+            inp.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/[^\d]/g, '');
+                if (val) {
+                    e.target.value = parseInt(val, 10).toLocaleString('ru-RU');
+                } else {
+                    e.target.value = '';
+                }
+                calculateNet();
+            });
+        }
+    });
+
     // Form Submit
     addForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -1013,34 +1052,67 @@ function setupEventListeners() {
         if (navigator.vibrate) navigator.vibrate(50);
         
         const type = document.querySelector('input[name="type"]:checked').value;
-        const rawAmount = document.getElementById('amountInput').value.replace(/\s/g, '').replace(/&nbsp;/g, '').replace(/\u00A0/g, '');
-        const amount = parseFloat(rawAmount);
+        const category = type === 'debt' ? 'other' : categoryInput.value;
         const person = document.getElementById('personInput').value.trim();
         const note = document.getElementById('noteInput').value.trim();
-        
-        // Save memory
-        localStorage.setItem('lastAddType', type);
-        if (type !== 'debt') {
-            localStorage.setItem('lastAddCategory', document.getElementById('categoryInput').value);
-        }
-        
-        // Always save with today's date in current month for simplicity, 
-        // or we could save to the currently selected month. Let's save to currently selected month/year.
         const dateObj = new Date();
         dateObj.setFullYear(currentYear);
         dateObj.setMonth(currentMonth);
 
+        // Check if Lesson Rental
+        const lessonType = document.querySelector('input[name="lessonType"]:checked')?.value;
+        const isRental = type === 'income' && category === 'lessons' && lessonType === 'rental';
+
+        let transactionsToAdd = [];
+
+        if (isRental) {
+            const gross = parseInt(rentalGrossInput.value.replace(/\s/g, '')) || 0;
+            const cost = parseInt(rentalCostInput.value.replace(/\s/g, '')) || 0;
+            
+            if (gross > 0) {
+                transactionsToAdd.push({
+                    type: 'income',
+                    amount: gross,
+                    category: 'lessons',
+                    person,
+                    note
+                });
+            }
+            if (cost > 0) {
+                transactionsToAdd.push({
+                    type: 'expense',
+                    amount: cost,
+                    category: 'rehearsal',
+                    person,
+                    note: note ? note + ' (Аренда за урок)' : 'Аренда за урок'
+                });
+            }
+        } else {
+            const rawAmount = document.getElementById('amountInput').value.replace(/\s/g, '').replace(/&nbsp;/g, '').replace(/\u00A0/g, '');
+            const amount = parseFloat(rawAmount) || 0;
+            transactionsToAdd.push({ type, amount, category, person, note });
+        }
+        
+        // Save memory
+        localStorage.setItem('lastAddType', type);
+        if (type !== 'debt') {
+            localStorage.setItem('lastAddCategory', category);
+        }
+
         if (editingTxId) {
+            // Edit only the first one if it's a rental? Actually, don't allow converting to rental during edit.
+            // Just edit the existing transaction with the first item in transactionsToAdd.
             const txIndex = state.transactions.findIndex(t => t.id === editingTxId);
-            if (txIndex !== -1) {
+            if (txIndex !== -1 && transactionsToAdd.length > 0) {
+                const txData = transactionsToAdd[0];
                 state.transactions[txIndex] = {
                     ...state.transactions[txIndex],
                     tab: currentTab,
-                    type,
-                    amount,
-                    person,
-                    note,
-                    category: type === 'debt' ? 'other' : categoryInput.value
+                    type: txData.type,
+                    amount: txData.amount,
+                    person: txData.person,
+                    note: txData.note,
+                    category: txData.category
                 };
             }
             editingTxId = null;
@@ -1048,30 +1120,31 @@ function setupEventListeners() {
             if(btn) btn.textContent = 'Добавить';
             showToast('Изменения сохранены');
         } else {
-            if (type === 'debt') {
-                const debtType = document.getElementById('debtTypeInput').value;
-                state.debts.push({
-                    id: Date.now().toString(),
-                    tab: currentTab,
-                    type: debtType,
-                    amount,
-                    person,
-                    note,
-                    date: dateObj.toISOString()
-                });
-            } else {
-                const category = document.getElementById('categoryInput').value;
-                state.transactions.push({
-                    id: Date.now().toString(),
-                    tab: currentTab,
-                    type,
-                    amount,
-                    category,
-                    person,
-                    note,
-                    date: dateObj.toISOString()
-                });
-            }
+            transactionsToAdd.forEach((txData, index) => {
+                if (txData.type === 'debt') {
+                    const debtType = document.getElementById('debtTypeInput').value;
+                    state.debts.push({
+                        id: (Date.now() + index).toString(),
+                        tab: currentTab,
+                        type: debtType,
+                        amount: txData.amount,
+                        person: txData.person,
+                        note: txData.note,
+                        date: dateObj.toISOString()
+                    });
+                } else {
+                    state.transactions.push({
+                        id: (Date.now() + index).toString(),
+                        tab: currentTab,
+                        type: txData.type,
+                        amount: txData.amount,
+                        category: txData.category,
+                        person: txData.person,
+                        note: txData.note,
+                        date: dateObj.toISOString()
+                    });
+                }
+            });
             showToast('Успешно добавлено');
         }
 
@@ -1102,6 +1175,39 @@ function toggleFormFields(type) {
         categoryGroup.style.display = 'block';
         debtTypeGroup.style.display = 'none';
     }
+    toggleLessonFields();
+}
+
+function toggleLessonFields() {
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const cat = categoryInput.value;
+    
+    if (type === 'income' && cat === 'lessons') {
+        lessonSpecialGroup.style.display = 'block';
+        const lessonType = document.querySelector('input[name="lessonType"]:checked').value;
+        if (lessonType === 'rental') {
+            lessonRentalFields.style.display = 'block';
+            amountGroup.style.display = 'none';
+            document.getElementById('amountInput').required = false;
+        } else {
+            lessonRentalFields.style.display = 'none';
+            amountGroup.style.display = 'block';
+            document.getElementById('amountInput').required = true;
+            
+            if (lessonType === 'school') {
+                const amountInput = document.getElementById('amountInput');
+                if (!amountInput.value) {
+                    amountInput.value = '25';
+                    // Optional: trigger input event to format
+                    amountInput.dispatchEvent(new Event('input'));
+                }
+            }
+        }
+    } else {
+        lessonSpecialGroup.style.display = 'none';
+        amountGroup.style.display = 'block';
+        document.getElementById('amountInput').required = true;
+    }
 }
 
 function updateMonthLabel() {
@@ -1109,5 +1215,214 @@ function updateMonthLabel() {
     currentMonthLabel.textContent = `${months[currentMonth]} ${currentYear}`;
 }
 
-// Start
+// Initial setup
 init();
+
+// Voice Input Logic
+const voiceInputBtn = document.getElementById('voiceInputBtn');
+
+function convertWordsToNumbers(text) {
+    const numDict = {
+        'ноль': 0, 'один': 1, 'одна': 1, 'два': 2, 'две': 2, 'три': 3, 'четыре': 4, 'пять': 5,
+        'шесть': 6, 'семь': 7, 'восемь': 8, 'девять': 9, 'десять': 10,
+        'одиннадцать': 11, 'двенадцать': 12, 'тринадцать': 13, 'четырнадцать': 14,
+        'пятнадцать': 15, 'шестнадцать': 16, 'семнадцать': 17, 'восемнадцать': 18,
+        'девятнадцать': 19, 'двадцать': 20, 'тридцать': 30, 'сорок': 40,
+        'пятьдесят': 50, 'шестьдесят': 60, 'семьдесят': 70, 'восемьдесят': 80,
+        'девяносто': 90, 'сто': 100, 'двести': 200, 'триста': 300, 'четыреста': 400,
+        'пятьсот': 500, 'шестьсот': 600, 'семьсот': 700, 'восемьсот': 800, 'девятьсот': 900,
+        'тысяча': 1000, 'тысячи': 1000, 'тысяч': 1000
+    };
+    
+    // Very basic replacement. E.g. "сто пятьдесят" -> "100 50" -> later regex will grab first numbers, 
+    // which is not ideal, but for simple phrases like "пятьдесят" it will yield "50".
+    // For full parsing, we'd need complex logic. Let's just try to replace exact word matches if they stand alone.
+    let words = text.split(' ');
+    for (let i = 0; i < words.length; i++) {
+        let w = words[i].replace(/[^а-яё]/g, '');
+        if (numDict[w] !== undefined) {
+            words[i] = numDict[w];
+        }
+    }
+    return words.join(' ');
+}
+
+if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ru-RU';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    if (voiceInputBtn) {
+        voiceInputBtn.addEventListener('click', () => {
+            voiceInputBtn.classList.add('listening');
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+            try {
+                recognition.start();
+                showToast('Говорите...');
+            } catch (e) {
+                // Ignore if already started
+                showToast('Говорите...');
+            }
+        });
+    }
+
+    recognition.addEventListener('result', (e) => {
+        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+        try {
+            const rawTranscript = e.results[0][0].transcript.toLowerCase();
+            const transcript = convertWordsToNumbers(rawTranscript);
+            parseVoiceCommand(transcript);
+        } catch (err) {
+            showToast('JS Ошибка: ' + err.message);
+        }
+    });
+
+    recognition.addEventListener('error', (e) => {
+        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+        if (e.error === 'audio-capture') {
+            showToast('Микрофон заблокирован iOS. Перезапустите приложение (смахните вверх).');
+        } else {
+            showToast('Ошибка микрофона: ' + e.error);
+        }
+    });
+    
+    recognition.addEventListener('end', () => {
+        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+    });
+} else {
+    if (voiceInputBtn) voiceInputBtn.style.display = 'none';
+}
+
+function parseVoiceCommand(text) {
+    let type = 'expense'; // default
+    let category = 'other';
+    let amount = '';
+    let rentalCost = '';
+    let person = '';
+    let note = text;
+    let lessonType = 'normal';
+
+    // 1. Extract ALL Amounts
+    const numbersMatch = text.match(/\d+/g);
+    if (numbersMatch && numbersMatch.length > 0) {
+        amount = numbersMatch[0];
+        note = note.replace(numbersMatch[0], '').trim();
+        
+        if (numbersMatch.length > 1) {
+            rentalCost = numbersMatch[1];
+            note = note.replace(numbersMatch[1], '').trim();
+        }
+    }
+
+    // 2. Extract Type
+    const incomeKeywords = ['урок', 'доход', 'заработал', 'дали', 'получил', 'пришло', 'плюс', 'вернул', 'перевел'];
+    const debtKeywords = ['долг', 'занял', 'одолжил'];
+    
+    if (incomeKeywords.some(kw => text.includes(kw))) {
+        type = 'income';
+    } else if (debtKeywords.some(kw => text.includes(kw))) {
+        type = 'debt';
+    }
+
+    // 3. Extract Category
+    if (text.includes('урок') || text.includes('заняти') || text.includes('ученик')) {
+        category = 'lessons';
+        type = 'income';
+        
+        // Detect Lesson Sub-Type
+        if (text.includes('школ')) {
+            lessonType = 'school';
+            amount = amount || '25'; // auto-fill if not mentioned
+        } else if (text.includes('аренд') || text.includes('баз')) {
+            lessonType = 'rental';
+        }
+    } else if (text.includes('база') || text.includes('реп') || text.includes('аренд')) {
+        category = 'rehearsal';
+        type = 'expense';
+    } else if (text.includes('концерт') || text.includes('выступлен') || text.includes('гиг')) {
+        category = 'concerts';
+    } else if (text.includes('стафф') || text.includes('оборудовани') || text.includes('палочки') || text.includes('пластик') || text.includes('струны')) {
+        category = 'gear';
+        type = 'expense';
+    } else if (text.includes('реклам') || text.includes('таргет')) {
+        category = 'ads';
+        type = 'expense';
+    } else if (text.includes('дистро') || text.includes('релиз') || text.includes('дистрибуц')) {
+        category = 'distrokid';
+        type = 'expense';
+    } else if (text.includes('мерч') || text.includes('футболк')) {
+        category = 'merch';
+        type = 'expense';
+    }
+
+    // Open Modal and Fill
+    openModal(addModal);
+    
+    // Set Type
+    const typeRadio = document.querySelector(`input[name="type"][value="${type}"]`);
+    if (typeRadio) {
+        typeRadio.checked = true;
+        toggleFormFields(type);
+    }
+    
+    // Set Category
+    if (type !== 'debt') {
+        categoryInput.value = category;
+        toggleLessonFields(); // Make sure lessonSpecialGroup is shown if needed
+    }
+    
+    // If it's a lesson, set the sub-type radio
+    if (category === 'lessons') {
+        const lessonRadio = document.querySelector(`input[name="lessonType"][value="${lessonType}"]`);
+        if (lessonRadio) {
+            lessonRadio.checked = true;
+            toggleLessonFields(); // toggle inputs based on lessonType
+        }
+    }
+    
+    // Set Amounts
+    if (lessonType === 'rental') {
+        if (amount) {
+            const rGross = document.getElementById('rentalGrossInput');
+            rGross.value = amount;
+            rGross.dispatchEvent(new Event('input'));
+        }
+        if (rentalCost) {
+            const rCost = document.getElementById('rentalCostInput');
+            rCost.value = rentalCost;
+            rCost.dispatchEvent(new Event('input'));
+        }
+    } else {
+        if (amount) {
+            const amountInput = document.getElementById('amountInput');
+            amountInput.value = amount;
+            amountInput.dispatchEvent(new Event('input')); // format
+        }
+    }
+    
+    // Cleanup note
+    let cleanNote = note;
+    const stopWords = ['урок', 'доход', 'заработал', 'получил', 'купил', 'потратил', 'отдал', 'база', 'репа', 'минус', 'оплата', 'евро', 'рублей', 'бакс', 'за', 'на', 'мне'];
+    stopWords.forEach(w => {
+        cleanNote = cleanNote.replace(new RegExp(`\\b${w}\\b`, 'gi'), '');
+    });
+    cleanNote = cleanNote.replace(/\s+/g, ' ').trim();
+    // Capitalize first letter
+    if (cleanNote) {
+        cleanNote = cleanNote.charAt(0).toUpperCase() + cleanNote.slice(1);
+    }
+    
+    if (category === 'lessons') {
+        document.getElementById('personInput').value = cleanNote;
+        document.getElementById('noteInput').value = '';
+    } else {
+        document.getElementById('personInput').value = '';
+        document.getElementById('noteInput').value = cleanNote;
+    }
+    
+    showToast('Распознано: ' + text);
+}

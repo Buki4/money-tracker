@@ -600,3 +600,30 @@ body {
 .submit-btn, .pay-btn, .tab-btn, .nav-item, .month-btn {
     transition: transform 0.2s ease, opacity 0.2s ease, background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
+
+/* Voice Input */
+.voice-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--text-primary);
+    margin-right: 10px;
+    transition: all 0.3s ease;
+}
+.voice-btn.listening {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    animation: pulse-red 1.5s infinite;
+}
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
