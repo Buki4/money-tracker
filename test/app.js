@@ -1283,7 +1283,11 @@ if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
 
     recognition.addEventListener('error', (e) => {
         if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
-        showToast('Ошибка микрофона: ' + e.error);
+        if (e.error === 'audio-capture') {
+            showToast('Микрофон заблокирован iOS. Перезапустите приложение (смахните вверх).');
+        } else {
+            showToast('Ошибка микрофона: ' + e.error);
+        }
     });
     
     recognition.addEventListener('end', () => {
