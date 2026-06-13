@@ -1309,11 +1309,8 @@ function parseVoiceCommand(text) {
     // 1. Extract ALL Amounts
     const numbersMatch = text.match(/\d+/g);
     if (numbersMatch && numbersMatch.length > 0) {
-        // If we converted "сто пятьдесят" -> "100", "50"
-        // Let's do a quick hack: if adjacent numbers, maybe sum them?
-        // Actually, just take the first digit block. For simple use cases, people say "50" and the API writes "50".
         amount = numbersMatch[0];
-        note = note.replace(amountMatch[0], '').trim();
+        note = note.replace(numbersMatch[0], '').trim();
         
         if (numbersMatch.length > 1) {
             rentalCost = numbersMatch[1];
