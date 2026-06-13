@@ -1249,54 +1249,68 @@ function convertWordsToNumbers(text) {
 
 if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = new SpeechRecognition();
-    recognition.lang = 'ru-RU';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    let recognition = null;
     let isRecognizing = false;
+
+    function initRecognition() {
+        const rec = new SpeechRecognition();
+        rec.lang = 'ru-RU';
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+
+        rec.addEventListener('start', () => {
+            isRecognizing = true;
+            if (voiceInputBtn) voiceInputBtn.classList.add('listening');
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+            showToast('Говорите...');
+        });
+
+        rec.addEventListener('result', (e) => {
+            const rawTranscript = e.results[0][0].transcript.toLowerCase();
+            const transcript = convertWordsToNumbers(rawTranscript);
+            parseVoiceCommand(transcript);
+        });
+
+        rec.addEventListener('error', (e) => {
+            isRecognizing = false;
+            if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+            if (e.error !== 'no-speech') {
+                showToast('Ошибка микрофона: ' + e.error);
+            }
+            // If iOS bugs out and aborts, we will need to re-init on next click
+            recognition = null; 
+        });
+        
+        rec.addEventListener('end', () => {
+            isRecognizing = false;
+            if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
+        });
+
+        return rec;
+    }
 
     if (voiceInputBtn) {
         voiceInputBtn.addEventListener('click', () => {
-            if (isRecognizing) {
+            if (isRecognizing && recognition) {
                 recognition.stop();
                 return;
             }
             try {
+                if (!recognition) {
+                    recognition = initRecognition();
+                }
                 recognition.start();
             } catch(e) {
-                // If it fails to start, try recreating
-                recognition = new SpeechRecognition();
-                recognition.lang = 'ru-RU';
-                recognition.start();
+                // Force re-init if stuck in bad state
+                recognition = initRecognition();
+                try {
+                    recognition.start();
+                } catch(err) {
+                    showToast('Не удалось запустить микрофон');
+                }
             }
         });
     }
-
-    recognition.addEventListener('start', () => {
-        isRecognizing = true;
-        if (voiceInputBtn) voiceInputBtn.classList.add('listening');
-        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-        showToast('Говорите...');
-    });
-
-    recognition.addEventListener('result', (e) => {
-        const rawTranscript = e.results[0][0].transcript.toLowerCase();
-        const transcript = convertWordsToNumbers(rawTranscript);
-        parseVoiceCommand(transcript);
-    });
-
-    recognition.addEventListener('error', (e) => {
-        isRecognizing = false;
-        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
-        if (e.error !== 'no-speech') {
-            showToast('Ошибка микрофона: ' + e.error);
-        }
-    });
-    
-    recognition.addEventListener('end', () => {
-        isRecognizing = false;
-        if (voiceInputBtn) voiceInputBtn.classList.remove('listening');
-    });
 } else {
     if (voiceInputBtn) voiceInputBtn.style.display = 'none';
 }
