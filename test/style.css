@@ -682,9 +682,11 @@ body {
 .swipe-container {
     position: relative;
     overflow: hidden;
-    padding: 0 !important; /* override transaction-item padding */
+    padding: 0 !important;
     background: transparent !important;
     border: none !important;
+    display: block !important; /* Override .transaction-item display: flex */
+    width: 100%;
 }
 .swipe-actions {
     position: absolute;
@@ -725,6 +727,8 @@ body {
     justify-content: space-between;
     align-items: center;
     transform: translateX(0);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Pending Status */
