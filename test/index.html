@@ -50,6 +50,7 @@
             <div class="balance-card">
                 <div class="balance-title">Баланс за месяц</div>
                 <div class="balance-amount" id="totalBalance">0 €</div>
+                <div style="text-align: center; font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 12px; display: none;" id="expectedBalanceContainer">Ожидается: <span id="expectedBalanceAmount" style="color: var(--income);">0 €</span></div>
                 
                 <div class="total-overall">Общий профит: <span id="overallBalance" style="font-weight: bold;">0 €</span></div>
                 
@@ -193,8 +194,20 @@
                     </div>
 
                     <div class="form-group" id="personGroup">
-                        <label>Имя (Ученик/Коллега)</label>
-                        <input type="text" id="personInput" placeholder="Например: Вася">
+                        <label>Кто (Имя / Группа)</label>
+                        <input type="text" id="personInput" list="personsList" placeholder="Необязательно" autocomplete="off">
+                    </div>
+
+                    <div class="form-group" id="categoryGroup">
+                        <label>Категория</label>
+                        <select id="categoryInput">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+
+                    <div class="form-group checkbox-group" id="pendingGroup" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <input type="checkbox" id="pendingInput" style="width: 18px; height: 18px;">
+                        <label for="pendingInput" style="margin: 0; color: var(--text-main);">Ожидается оплата ⏳</label>
                     </div>
 
                     <div class="form-group debt-type-group" id="debtTypeGroup" style="display: none;">
@@ -207,7 +220,7 @@
 
                     <div class="form-group">
                         <label>Заметка</label>
-                        <input type="text" id="noteInput" placeholder="Необязательно">
+                        <input type="text" id="noteInput" list="notesList" placeholder="Необязательно" autocomplete="off">
                     </div>
 
                     <button type="submit" class="submit-btn">Добавить</button>
@@ -241,6 +254,14 @@
                     <button id="editCategoriesBtn" class="submit-btn" style="margin-top: 12px; background: var(--glass-bg); border: 1px solid var(--glass-border);">🏷 Редактировать категории</button>
 
 
+
+                    <div class="form-group" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+                        <label style="margin: 0;">Звуки интерфейса</label>
+                        <label class="switch">
+                            <input type="checkbox" id="soundToggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
 
                     <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
                         <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 8px;">Названия вкладок</label>
@@ -329,7 +350,11 @@
     </div>
 
     <!-- Toast Notification -->
-        <div id="toast" class="toast">Сообщение</div>
+    <div id="toast" class="toast">Сообщение</div>
+
+    <!-- Datalists for Smart Autocomplete -->
+    <datalist id="personsList"></datalist>
+    <datalist id="notesList"></datalist>
 
     </div>
 

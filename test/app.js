@@ -12,9 +12,10 @@ window.addEventListener('unhandledrejection', function(e) {
 
 // State Management
 let state = {
-    transactions: [], // { id, tab, type, amount, category, person, note, date }
+    transactions: [], // { id, tab, type, amount, category, person, note, date, status }
     debts: [], // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
-    tabNames: { drums: 'Барабаны', vocals: 'Вокал' }
+    tabNames: { drums: 'Барабаны', vocals: 'Вокал' },
+    soundEnabled: true
 };
 
 // Categories based on tab
@@ -175,8 +176,11 @@ function init() {
     loadData();
     setupEventListeners();
     updateMonthLabel();
-    render();
     
+    renderSkeletons();
+    setTimeout(() => {
+        render();
+    }, 400);
     checkChangelog();
     checkForUpdates();
     
@@ -298,7 +302,20 @@ function loadData() {
             state.debts = parsed.debts || [];
             state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
             state.categories = parsed.categories || null;
+            if (parsed.soundEnabled !== undefined) {
+                state.soundEnabled = parsed.soundEnabled;
+            }
         } catch(e) { console.error(e); }
+    }
+    
+    const soundToggle = document.getElementById('soundToggle');
+    if (soundToggle) {
+        soundToggle.checked = state.soundEnabled;
+        soundToggle.addEventListener('change', (e) => {
+            state.soundEnabled = e.target.checked;
+            saveData();
+            if (state.soundEnabled) audioService.playClick();
+        });
     }
     
     // Inject missing seed data to ensure it always loads
@@ -325,6 +342,8 @@ function loadData() {
 
 function saveData() {
     localStorage.setItem('tempoTrackerData', JSON.stringify(state));
+    localStorage.setItem('lastFileBackupDate', Date.now().toString());
+    updateAutocomplete();
 }
 
 let undoTimeout = null;
@@ -398,6 +417,21 @@ function render() {
     renderDebts();
 }
 
+function renderSkeletons() {
+    const transactionsListEl = document.getElementById('transactionsList');
+    if (!transactionsListEl) return;
+    
+    let html = '';
+    for(let i=0; i<4; i++) {
+        html += `
+        <div class="transaction-item skeleton-container" style="animation-delay: ${i*0.05}s">
+            <div class="skeleton skeleton-text" style="width: 120px;"></div>
+            <div class="skeleton skeleton-text" style="width: 80px;"></div>
+        </div>`;
+    }
+    transactionsListEl.innerHTML = html;
+}
+
 function renderDashboard() {
     // 1. Calculate overall balance for the current tab
     let overallIncome = 0;
@@ -405,7 +439,7 @@ function renderDashboard() {
     
     state.transactions.forEach(tx => {
         if (tx.tab === currentTab) {
-            if (tx.type === 'income') overallIncome += tx.amount;
+            if (tx.type === 'income' && tx.status !== 'pending') overallIncome += tx.amount;
             if (tx.type === 'expense') overallExpense += tx.amount;
         }
     });
@@ -425,9 +459,13 @@ function renderDashboard() {
 
     let income = 0;
     let expense = 0;
+    let expectedIncome = 0;
 
     filteredTx.forEach(tx => {
-        if (tx.type === 'income') income += tx.amount;
+        if (tx.type === 'income') {
+            if (tx.status === 'pending') expectedIncome += tx.amount;
+            else income += tx.amount;
+        }
         if (tx.type === 'expense') expense += tx.amount;
     });
 
@@ -442,6 +480,17 @@ function renderDashboard() {
     animateValue(totalBalanceEl, prevStats.balance, balance, 600, formatTotal);
     animateValue(totalIncomeEl, prevStats.income, income, 600, formatTotal);
     animateValue(totalExpenseEl, prevStats.expense, expense, 600, formatTotal);
+
+    const expBalCont = document.getElementById('expectedBalanceContainer');
+    const expBalAmt = document.getElementById('expectedBalanceAmount');
+    if (expBalCont && expBalAmt) {
+        if (expectedIncome > 0) {
+            expBalCont.style.display = 'block';
+            expBalAmt.textContent = `+${formatTotal(expectedIncome)}`;
+        } else {
+            expBalCont.style.display = 'none';
+        }
+    }
 
     prevStats.overallBalance = overallBalance;
     prevStats.balance = balance;
@@ -486,21 +535,32 @@ function renderDashboard() {
             const sign = tx.type === 'income' ? '+' : '-';
             const cls = tx.type === 'income' ? 'income' : 'expense';
             const personStr = tx.person ? ` • ${tx.person}` : '';
+            const isPending = tx.status === 'pending';
+            const pendingHtml = isPending ? `<div class="pending-badge" onclick="event.stopPropagation(); togglePending('${tx.id}')">⏳</div>` : '';
             
             const el = document.createElement('div');
-            el.className = 'transaction-item stagger-item';
+            el.className = 'transaction-item stagger-item swipe-container';
             el.style.animationDelay = `${renderIndex * 0.05}s`;
             el.id = `tx-${tx.id}`;
             el.innerHTML = `
-                <div class="tx-info" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
-                    <div class="tx-category">${catLabel} <span style="font-size: 10px; opacity: 0.5; margin-left: 4px;">✏️</span></div>
-                    <div class="tx-person">${personStr.replace(' • ', '')}</div>
+                <div class="swipe-actions">
+                    <div class="swipe-action left" onclick="editTransaction('${tx.id}')">✏️ Edit</div>
+                    <div class="swipe-action right" onclick="deleteTransaction('${tx.id}')">✕ Delete</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div class="tx-amount ${cls}" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €</div>
-                    <button class="delete-btn" onclick="deleteTransaction('${tx.id}')">✕</button>
+                <div class="swipe-content ${isPending ? 'pending-tx' : ''}">
+                    <div class="tx-info" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
+                        <div class="tx-category">${catLabel}</div>
+                        <div class="tx-person">${personStr.replace(' • ', '')}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${pendingHtml}
+                        <div class="tx-amount ${cls}" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
+                            ${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
+                        </div>
+                    </div>
                 </div>
             `;
+            initSwipe(el, tx.id);
             transactionsListEl.appendChild(el);
             renderIndex++;
         });
@@ -577,6 +637,11 @@ window.editTransaction = function(id) {
     }
     document.getElementById('personInput').value = tx.person || '';
     document.getElementById('noteInput').value = tx.note || '';
+    
+    const pendingInput = document.getElementById('pendingInput');
+    if (pendingInput) {
+        pendingInput.checked = (tx.status === 'pending');
+    }
     
     const btn = addForm.querySelector('button[type="submit"]');
     if(btn) btn.textContent = 'Сохранить изменения';
@@ -730,6 +795,7 @@ function setupEventListeners() {
     navHome.addEventListener('click', (e) => {
         e.preventDefault();
         if (currentView === 'dashboard') return;
+        audioService.playClick();
         currentView = 'dashboard';
         navHome.classList.add('active');
         navDebts.classList.remove('active');
@@ -742,6 +808,7 @@ function setupEventListeners() {
     navDebts.addEventListener('click', (e) => {
         e.preventDefault();
         if (currentView === 'debts') return;
+        audioService.playClick();
         currentView = 'debts';
         navDebts.classList.add('active');
         navHome.classList.remove('active');
@@ -754,6 +821,7 @@ function setupEventListeners() {
     // Tab Switching
     tabDrums.addEventListener('click', () => {
         if (currentTab === 'drums') return;
+        audioService.playClick();
         currentTab = 'drums';
         tabDrums.classList.add('active');
         tabVocals.classList.remove('active');
@@ -763,6 +831,7 @@ function setupEventListeners() {
 
     tabVocals.addEventListener('click', () => {
         if (currentTab === 'vocals') return;
+        audioService.playClick();
         currentTab = 'vocals';
         tabVocals.classList.add('active');
         tabDrums.classList.remove('active');
@@ -1185,7 +1254,8 @@ function setupEventListeners() {
                     amount: gross,
                     category: 'lessons',
                     person,
-                    note
+                    note,
+                    status: pendingInput.checked ? 'pending' : 'completed'
                 });
             }
             if (cost > 0) {
@@ -1194,13 +1264,21 @@ function setupEventListeners() {
                     amount: cost,
                     category: 'rehearsal',
                     person,
-                    note: note ? note + ' (Аренда за урок)' : 'Аренда за урок'
+                    note: note ? note + ' (Аренда за урок)' : 'Аренда за урок',
+                    status: 'completed'
                 });
             }
         } else {
             const rawAmount = document.getElementById('amountInput').value.replace(/\s/g, '').replace(/&nbsp;/g, '').replace(/\u00A0/g, '');
             const amount = parseFloat(rawAmount) || 0;
-            transactionsToAdd.push({ type, amount, category, person, note });
+            transactionsToAdd.push({ 
+                type, 
+                amount, 
+                category, 
+                person, 
+                note,
+                status: (type === 'income' && pendingInput.checked) ? 'pending' : 'completed'
+            });
         }
         
         // Save memory
@@ -1222,13 +1300,15 @@ function setupEventListeners() {
                     amount: txData.amount,
                     person: txData.person,
                     note: txData.note,
-                    category: txData.category
+                    category: txData.category,
+                    status: txData.status || 'completed'
                 };
             }
             editingTxId = null;
             const btn = addForm.querySelector('button[type="submit"]');
             if(btn) btn.textContent = 'Добавить';
             showToast('Изменения сохранены');
+            audioService.playSuccess();
         } else {
             transactionsToAdd.forEach((txData, index) => {
                 if (txData.type === 'debt') {
@@ -1251,11 +1331,13 @@ function setupEventListeners() {
                         category: txData.category,
                         person: txData.person,
                         note: txData.note,
+                        status: txData.status || 'completed',
                         date: dateObj.toISOString()
                     });
                 }
             });
             showToast('Успешно добавлено');
+            audioService.playSuccess();
         }
 
         saveData();
@@ -1628,6 +1710,152 @@ function initCategoryEditor() {
     }
 }
 
+function updateAutocomplete() {
+    const personsList = document.getElementById('personsList');
+    const notesList = document.getElementById('notesList');
+    if (!personsList || !notesList) return;
+    
+    personsList.innerHTML = '';
+    notesList.innerHTML = '';
+    
+    const uniquePersons = new Set();
+    const uniqueNotes = new Set();
+    
+    state.transactions.forEach(tx => {
+        if (tx.person) uniquePersons.add(tx.person);
+        if (tx.note) uniqueNotes.add(tx.note);
+    });
+    
+    uniquePersons.forEach(person => {
+        const option = document.createElement('option');
+        option.value = person;
+        personsList.appendChild(option);
+    });
+    
+    uniqueNotes.forEach(note => {
+        const option = document.createElement('option');
+        option.value = note;
+        notesList.appendChild(option);
+    });
+}
+
+// --- Audio Service ---
+const audioService = {
+    ctx: null,
+    init() {
+        if (!this.ctx && state.soundEnabled) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+            } catch (e) {
+                console.warn('AudioContext not supported', e);
+            }
+        }
+    },
+    playOscillator(freq, type, duration, vol) {
+        if (!state.soundEnabled || !this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playClick() {
+        this.init();
+        this.playOscillator(600, 'sine', 0.1, 0.05);
+    },
+    playSuccess() {
+        this.init();
+        this.playOscillator(440, 'sine', 0.1, 0.05);
+        setTimeout(() => this.playOscillator(554.37, 'sine', 0.1, 0.05), 100);
+        setTimeout(() => this.playOscillator(659.25, 'sine', 0.2, 0.05), 200);
+    },
+    playDelete() {
+        this.init();
+        if (!state.soundEnabled || !this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+    }
+};
+
+// --- Status Logic ---
+window.togglePending = function(id) {
+    const tx = state.transactions.find(t => t.id === id);
+    if (tx && tx.status === 'pending') {
+        tx.status = 'completed';
+        saveData();
+        render();
+        showToast('Оплата получена!');
+        if (typeof audioService !== 'undefined') audioService.playSuccess();
+    }
+};
+
+// --- Swipe to Delete / Edit Logic ---
+function initSwipe(el, id) {
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+    const content = el.querySelector('.swipe-content');
+    
+    el.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+        content.style.transition = 'none';
+    }, { passive: true });
+    
+    el.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentX = e.touches[0].clientX - startX;
+        // Limit max swipe distance
+        if (currentX > 100) currentX = 100;
+        if (currentX < -100) currentX = -100;
+        content.style.transform = `translateX(${currentX}px)`;
+    }, { passive: true });
+    
+    el.addEventListener('touchend', () => {
+        isDragging = false;
+        content.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+        
+        if (currentX < -60) {
+            // Swiped left - delete
+            content.style.transform = `translateX(-100%)`;
+            setTimeout(() => {
+                deleteTransaction(id);
+                if (typeof audioService !== 'undefined') audioService.playDelete();
+            }, 300);
+        } else if (currentX > 60) {
+            // Swiped right - edit
+            content.style.transform = `translateX(100%)`;
+            setTimeout(() => {
+                content.style.transform = `translateX(0)`;
+                editTransaction(id);
+                if (typeof audioService !== 'undefined') audioService.playClick();
+            }, 300);
+        } else {
+            // Snap back
+            content.style.transform = `translateX(0)`;
+        }
+        currentX = 0;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initCategoryEditor();
+    updateAutocomplete();
 });
