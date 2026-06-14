@@ -739,10 +739,12 @@ function setupEventListeners() {
     let touchEndX = 0;
     let touchStartY = 0;
     let touchEndY = 0;
+    let isItemSwipe = false;
     
     document.addEventListener('touchstart', e => {
         touchStartX = e.changedTouches[0].clientX;
         touchStartY = e.changedTouches[0].clientY;
+        isItemSwipe = !!e.target.closest('.swipe-container');
     }, {passive: true});
 
     document.addEventListener('touchend', e => {
@@ -753,6 +755,7 @@ function setupEventListeners() {
 
     function handleSwipe() {
         if (addModal.classList.contains('active') || settingsModal.classList.contains('active')) return;
+        if (isItemSwipe) return; // Prevent tab switch when swiping a transaction
         
         const diffX = touchStartX - touchEndX;
         const diffY = touchStartY - touchEndY;
