@@ -733,8 +733,7 @@ body {
 
 /* Pending Status */
 .pending-tx {
-    border: 1px dashed var(--text-muted);
-    opacity: 0.8;
+    border: 1px dashed rgba(245, 158, 11, 0.5) !important;
 }
 .pending-badge {
     display: inline-flex;
