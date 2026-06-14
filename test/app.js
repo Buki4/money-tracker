@@ -304,6 +304,8 @@ function loadData() {
             state.transactions = parsed.transactions || [];
             state.debts = parsed.debts || [];
             state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
+            state.pinCode = parsed.pinCode || null;
+            state.categories = parsed.categories || null;
         } catch(e) { console.error(e); }
     }
     
@@ -1725,8 +1727,10 @@ function initCategoryEditor() {
     if (editBtn) {
         editBtn.addEventListener('click', () => {
             closeModal(document.getElementById('settingsModal'));
-            openModal(modal);
-            renderList();
+            setTimeout(() => {
+                openModal(modal);
+                renderList();
+            }, 100);
         });
     }
 
@@ -1756,4 +1760,18 @@ function initCategoryEditor() {
 document.addEventListener('DOMContentLoaded', () => {
     initPinLogic();
     initCategoryEditor();
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        if (state.pinCode && !isSettingPin) {
+            const pinOverlay = document.getElementById('pinOverlay');
+            if (pinOverlay && pinOverlay.style.display === 'none') {
+                pinOverlay.style.display = 'flex';
+                document.getElementById('pinTitle').textContent = 'Введите ПИН-код';
+                currentPinInput = '';
+                document.querySelectorAll('.pin-dot').forEach(d => { d.classList.remove('filled', 'error'); });
+            }
+        }
+    }
 });
