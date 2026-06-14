@@ -1,5 +1,5 @@
 :root {
-    /* Premium Dark Theme Colors */
+    /* Premium Dark Theme Colors (Default) */
     --bg-dark: #0f172a;
     --bg-card: rgba(30, 41, 59, 0.7);
     --bg-card-solid: #1e293b;
@@ -19,6 +19,33 @@
     /* Glassmorphism */
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-bg-hover: rgba(255, 255, 255, 0.2);
+    --nav-bg: rgba(15, 23, 42, 0.95);
+    --nav-border: rgba(255, 255, 255, 0.15);
+    --modal-overlay: rgba(0, 0, 0, 0.6);
+    --shadow-heavy: 0 10px 25px rgba(0, 0, 0, 0.5);
+    --input-bg: rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-dark: #f8fafc;
+        --bg-card: rgba(255, 255, 255, 0.85);
+        --bg-card-solid: #ffffff;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        
+        --glass-border: rgba(0, 0, 0, 0.1);
+        --glass-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.05);
+        --glass-bg: rgba(0, 0, 0, 0.05);
+        --glass-bg-hover: rgba(0, 0, 0, 0.1);
+        --nav-bg: rgba(255, 255, 255, 0.95);
+        --nav-border: rgba(0, 0, 0, 0.1);
+        --modal-overlay: rgba(0, 0, 0, 0.3);
+        --shadow-heavy: 0 10px 25px rgba(0, 0, 0, 0.1);
+        --input-bg: rgba(0, 0, 0, 0.03);
+    }
 }
 
 * {
@@ -92,7 +119,7 @@ body {
 }
 
 .month-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--glass-bg);
     border: none;
     border-radius: 6px;
     color: var(--text-main);
@@ -191,7 +218,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0,0,0,0.2);
+    background: var(--input-bg);
     border-radius: 16px;
     padding: 12px;
 }
@@ -244,10 +271,10 @@ body {
     bottom: 0;
     left: 0;
     width: 100%;
-    background: rgba(15, 23, 42, 0.95);
+    background: var(--nav-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 1px solid var(--nav-border);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: space-around;
@@ -297,7 +324,7 @@ body {
 .modal-overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6);
+    background: var(--modal-overlay);
     backdrop-filter: blur(5px);
     display: none;
     z-index: 100;
@@ -377,7 +404,7 @@ body {
 .form-group input[type="text"],
 .form-group select {
     width: 100%;
-    background: rgba(0,0,0,0.2);
+    background: var(--input-bg);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 14px;
@@ -411,7 +438,7 @@ body {
     text-align: center;
     padding: 10px;
     border-radius: 10px;
-    background: rgba(0,0,0,0.2);
+    background: var(--input-bg);
     border: 1px solid var(--glass-border);
     transition: 0.2s;
 }
@@ -499,7 +526,7 @@ body {
 .debt-item .amount.i-owe { color: var(--expense); }
 
 .pay-btn {
-    background: rgba(255,255,255,0.1);
+    background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     color: white;
     padding: 6px 12px;
@@ -603,7 +630,7 @@ body {
 
 /* Voice Input */
 .voice-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     border-radius: 50%;
     width: 36px;
@@ -626,4 +653,123 @@ body {
     0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
     70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Toast Update */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    padding: 12px 24px;
+    border-radius: 30px;
+    color: var(--text-main);
+    font-weight: 500;
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+}
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+/* PIN Overlay */
+
+/* Swipe to Delete/Edit */
+.swipe-container {
+    position: relative;
+    overflow: hidden;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    display: block !important; /* Override .transaction-item display: flex */
+    width: 100%;
+}
+.swipe-actions {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-dark);
+    z-index: 1;
+    border-radius: 12px;
+}
+.swipe-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 80px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+}
+.swipe-action.left {
+    background: var(--income);
+    border-radius: 12px 0 0 12px;
+}
+.swipe-action.right {
+    background: var(--expense);
+    border-radius: 0 12px 12px 0;
+}
+.swipe-content {
+    position: relative;
+    z-index: 2;
+    background: var(--bg-card-solid);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transform: translateX(0);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Pending Status */
+.pending-tx {
+    border: 1px dashed rgba(245, 158, 11, 0.5) !important;
+}
+.pending-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.pending-badge:active {
+    transform: scale(0.9);
+}
+
+/* Skeleton Loaders */
+.skeleton-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--glass-bg);
+}
+.skeleton {
+    background: #3a3a44;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.05) 20%, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0));
+    background-repeat: no-repeat;
+    background-size: 200px 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: 4px;
+}
+.skeleton-text {
+    height: 16px;
+}
+@keyframes shimmer {
+    0% { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
 }

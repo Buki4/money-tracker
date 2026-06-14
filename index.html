@@ -17,6 +17,8 @@
 <body>
     <div class="app-container">
         
+
+
         <!-- Header -->
         <header class="header">
             <div class="user-info">
@@ -48,6 +50,7 @@
             <div class="balance-card">
                 <div class="balance-title">Баланс за месяц</div>
                 <div class="balance-amount" id="totalBalance">0 €</div>
+                <div style="text-align: center; font-size: 13px; color: var(--text-muted); margin-top: -10px; margin-bottom: 12px; display: none;" id="expectedBalanceContainer">Ожидается: <span id="expectedBalanceAmount" style="color: var(--income);">0 €</span></div>
                 
                 <div class="total-overall">Общий профит: <span id="overallBalance" style="font-weight: bold;">0 €</span></div>
                 
@@ -191,8 +194,20 @@
                     </div>
 
                     <div class="form-group" id="personGroup">
-                        <label>Имя (Ученик/Коллега)</label>
-                        <input type="text" id="personInput" placeholder="Например: Вася">
+                        <label>Кто (Имя / Группа)</label>
+                        <input type="text" id="personInput" list="personsList" placeholder="Необязательно" autocomplete="off">
+                    </div>
+
+                    <div class="form-group" id="categoryGroup">
+                        <label>Категория</label>
+                        <select id="categoryInput">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+
+                    <div class="form-group checkbox-group" id="pendingGroup" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <input type="checkbox" id="pendingInput" style="width: 18px; height: 18px;">
+                        <label for="pendingInput" style="margin: 0; color: var(--text-main);">Ожидается оплата ⏳</label>
                     </div>
 
                     <div class="form-group debt-type-group" id="debtTypeGroup" style="display: none;">
@@ -205,7 +220,7 @@
 
                     <div class="form-group">
                         <label>Заметка</label>
-                        <input type="text" id="noteInput" placeholder="Необязательно">
+                        <input type="text" id="noteInput" list="notesList" placeholder="Необязательно" autocomplete="off">
                     </div>
 
                     <button type="submit" class="submit-btn">Добавить</button>
@@ -227,10 +242,26 @@
                     <button id="exportJsonBtn" class="submit-btn" style="margin-top: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">💾 Сохранить бэкап (JSON)</button>
                     <div style="margin-top: 12px;">
                         <input type="file" id="importJsonInput" accept=".json" style="display: none;">
-                        <button id="importJsonBtn" class="submit-btn" style="margin-top: 0; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">📥 Восстановить из бэкапа</button>
+                        <button id="importJsonBtn" class="submit-btn" style="margin-top: 0; background: var(--glass-bg); border: 1px solid var(--glass-border);">📥 Восстановить из файла</button>
                     </div>
+
+                    <button id="restoreAutoBackupBtn" class="submit-btn" style="margin-top: 12px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.5); color: #86efac;">🔄 Вернуть авто-бэкап</button>
+
+                    <button id="viewLogsBtn" class="submit-btn" style="margin-top: 12px; background: rgba(239, 68, 68, 0.2); border: 1px solid var(--expense); color: var(--expense);">🐛 Лог ошибок (Dev)</button>
                     
                     <button id="openFeedbackBtn" class="submit-btn" style="margin-top: 12px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.5); color: #c4b5fd;">💬 Оставить отзыв / Сообщить о баге</button>
+
+                    <button id="editCategoriesBtn" class="submit-btn" style="margin-top: 12px; background: var(--glass-bg); border: 1px solid var(--glass-border);">🏷 Редактировать категории</button>
+
+
+
+                    <div class="form-group" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+                        <label style="margin: 0;">Звуки интерфейса</label>
+                        <label class="switch">
+                            <input type="checkbox" id="soundToggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
 
                     <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
                         <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 8px;">Названия вкладок</label>
@@ -294,8 +325,36 @@
         </div>
     </div>
 
+    <!-- Categories Modal -->
+    <div id="categoriesModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Категории</h2>
+                <button class="close-btn" onclick="closeModal(document.getElementById('categoriesModal'))">✕</button>
+            </div>
+            
+            <div class="tab-switcher" style="margin-bottom: 15px;">
+                <button class="tab-btn active" data-cat-tab="drums" style="flex:1">Барабаны</button>
+                <button class="tab-btn" data-cat-tab="vocals" style="flex:1">Вокал</button>
+            </div>
+
+            <div id="categoriesList" style="max-height: 50vh; overflow-y: auto; margin-bottom: 15px;">
+                <!-- Dynamically populated list -->
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="newCategoryInput" placeholder="Новая категория" style="flex: 1; background: var(--input-bg); border: 1px solid var(--glass-border); color: white; border-radius: 12px; padding: 12px; box-sizing: border-box;">
+                <button id="addCategoryBtn" class="submit-btn" style="width: auto; padding: 0 20px;">➕</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
-        <div id="toast" class="toast">Сообщение</div>
+    <div id="toast" class="toast">Сообщение</div>
+
+    <!-- Datalists for Smart Autocomplete -->
+    <datalist id="personsList"></datalist>
+    <datalist id="notesList"></datalist>
 
     </div>
 
