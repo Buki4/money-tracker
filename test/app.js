@@ -14,15 +14,8 @@ window.addEventListener('unhandledrejection', function(e) {
 let state = {
     transactions: [], // { id, tab, type, amount, category, person, note, date }
     debts: [], // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
-    tabNames: { drums: 'Барабаны', vocals: 'Вокал' },
-    pinCode: null
+    tabNames: { drums: 'Барабаны', vocals: 'Вокал' }
 };
-
-// PIN Code Variables
-let currentPinInput = '';
-let isSettingPin = false;
-let confirmPinStep = false;
-let firstPinEntry = '';
 
 // Categories based on tab
 const categories = {
@@ -304,7 +297,6 @@ function loadData() {
             state.transactions = parsed.transactions || [];
             state.debts = parsed.debts || [];
             state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
-            state.pinCode = parsed.pinCode || null;
             state.categories = parsed.categories || null;
         } catch(e) { console.error(e); }
     }
@@ -673,37 +665,6 @@ window.payDebt = function(id) {
 
 // Event Listeners
 function setupEventListeners() {
-    // Settings logic
-    const togglePinBtn = document.getElementById('togglePinBtn');
-    
-    window.updateSettingsBtn = function() {
-        if (togglePinBtn) {
-            togglePinBtn.textContent = state.pinCode ? 'Удалить ПИН-код' : 'Установить ПИН-код';
-        }
-    };
-    updateSettingsBtn();
-
-    if (togglePinBtn) {
-        togglePinBtn.addEventListener('click', () => {
-            if (state.pinCode) {
-                if(confirm('Удалить ПИН-код?')) {
-                    state.pinCode = null;
-                    saveData();
-                    updateSettingsBtn();
-                    showToast('ПИН-код удален');
-                }
-            } else {
-                isSettingPin = true;
-                confirmPinStep = false;
-                currentPinInput = '';
-                document.getElementById('pinTitle').textContent = 'Придумайте ПИН-код';
-                document.querySelectorAll('.pin-dot').forEach(d => { d.classList.remove('filled', 'error'); });
-                closeModal(document.getElementById('settingsModal'));
-                document.getElementById('pinOverlay').style.display = 'flex';
-            }
-        });
-    }
-
     if (searchInput) {
         searchInput.addEventListener('input', render);
     }
@@ -1586,96 +1547,6 @@ function parseVoiceCommand(text) {
     showToast('Распознано: ' + text);
 }
 
-function initPinLogic() {
-    const pinOverlay = document.getElementById('pinOverlay');
-    const pinTitle = document.getElementById('pinTitle');
-    const dots = document.querySelectorAll('.pin-dot');
-    const numBtns = document.querySelectorAll('.num-btn[data-val]');
-    const delBtn = document.getElementById('pinDelBtn');
-    
-    if (!pinOverlay) return;
-
-    if (state.pinCode && !isSettingPin) {
-        pinOverlay.style.display = 'flex';
-        pinTitle.textContent = 'Введите ПИН-код';
-    }
-
-    function updateDots() {
-        dots.forEach((dot, i) => {
-            dot.classList.toggle('filled', i < currentPinInput.length);
-            dot.classList.remove('error');
-        });
-    }
-
-    function triggerError() {
-        if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
-        dots.forEach(dot => dot.classList.add('error'));
-        setTimeout(() => {
-            currentPinInput = '';
-            updateDots();
-        }, 400);
-    }
-
-    function processPin() {
-        if (currentPinInput.length !== 4) return;
-        
-        if (isSettingPin) {
-            if (!confirmPinStep) {
-                firstPinEntry = currentPinInput;
-                confirmPinStep = true;
-                currentPinInput = '';
-                pinTitle.textContent = 'Повторите ПИН-код';
-                updateDots();
-            } else {
-                if (currentPinInput === firstPinEntry) {
-                    state.pinCode = currentPinInput;
-                    saveData();
-                    isSettingPin = false;
-                    confirmPinStep = false;
-                    pinOverlay.style.display = 'none';
-                    showToast('ПИН-код установлен');
-                    const btn = document.getElementById('togglePinBtn');
-                    if (btn) btn.textContent = 'Удалить ПИН-код';
-                } else {
-                    triggerError();
-                    pinTitle.textContent = 'Не совпадает. Новый ПИН';
-                    confirmPinStep = false;
-                }
-            }
-        } else {
-            // Unlocking
-            if (currentPinInput === state.pinCode) {
-                pinOverlay.style.display = 'none';
-                currentPinInput = '';
-                updateDots();
-            } else {
-                triggerError();
-            }
-        }
-    }
-
-    numBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (currentPinInput.length < 4) {
-                currentPinInput += btn.getAttribute('data-val');
-                updateDots();
-                if (currentPinInput.length === 4) {
-                    setTimeout(processPin, 100); // delay to show dot
-                }
-            }
-        });
-    });
-
-    if (delBtn) {
-        delBtn.addEventListener('click', () => {
-            if (currentPinInput.length > 0) {
-                currentPinInput = currentPinInput.slice(0, -1);
-                updateDots();
-            }
-        });
-    }
-}
-
 // --- Category Editor Logic ---
 function initCategoryEditor() {
     const editBtn = document.getElementById('editCategoriesBtn');
@@ -1758,20 +1629,5 @@ function initCategoryEditor() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    initPinLogic();
     initCategoryEditor();
-});
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        if (state.pinCode && !isSettingPin) {
-            const pinOverlay = document.getElementById('pinOverlay');
-            if (pinOverlay && pinOverlay.style.display === 'none') {
-                pinOverlay.style.display = 'flex';
-                document.getElementById('pinTitle').textContent = 'Введите ПИН-код';
-                currentPinInput = '';
-                document.querySelectorAll('.pin-dot').forEach(d => { d.classList.remove('filled', 'error'); });
-            }
-        }
-    }
 });
