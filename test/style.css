@@ -717,7 +717,7 @@ body {
 .swipe-content {
     position: relative;
     z-index: 2;
-    background: var(--glass-bg);
+    background: var(--bg-card-solid);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 15px;
@@ -736,10 +736,11 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px; height: 24px;
-    background: rgba(255,255,255,0.1);
+    width: 28px; height: 28px;
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.5);
     border-radius: 50%;
-    font-size: 12px;
+    font-size: 14px;
     cursor: pointer;
     transition: 0.2s;
 }
