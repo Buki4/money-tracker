@@ -773,6 +773,75 @@ function setupEventListeners() {
         }
     }
 
+    // Custom Pull-To-Refresh
+    let ptrStartY = 0;
+    let ptrCurrentY = 0;
+    let isPtrDragging = false;
+    const ptrContainer = document.getElementById('pullToRefresh');
+    const appContainer = document.querySelector('.app-container');
+    const threshold = 150; // Increased threshold to make it less sensitive
+
+    document.addEventListener('touchstart', e => {
+        const view = document.querySelector('.view.active');
+        if (view && view.scrollTop <= 0) {
+            ptrStartY = e.touches[0].clientY;
+            isPtrDragging = true;
+            if (appContainer) appContainer.style.transition = 'none';
+            if (ptrContainer) ptrContainer.style.transition = 'none';
+        }
+    }, {passive: true});
+
+    document.addEventListener('touchmove', e => {
+        if (!isPtrDragging) return;
+        ptrCurrentY = e.touches[0].clientY;
+        const diffY = ptrCurrentY - ptrStartY;
+        
+        if (diffY > 0) {
+            const pullDistance = diffY / 2.5; // Resistance
+            if (appContainer) appContainer.style.transform = `translateY(${pullDistance}px)`;
+            
+            if (ptrContainer) {
+                ptrContainer.style.opacity = Math.min(diffY / 100, 1);
+                if (diffY > threshold) {
+                    ptrContainer.classList.add('ready');
+                    const textEl = ptrContainer.querySelector('.ptr-text');
+                    if (textEl) textEl.textContent = 'Отпустите для обновления';
+                } else {
+                    ptrContainer.classList.remove('ready');
+                    const textEl = ptrContainer.querySelector('.ptr-text');
+                    if (textEl) textEl.textContent = 'Потяните для обновления';
+                }
+            }
+            if (e.cancelable) e.preventDefault();
+        } else {
+            isPtrDragging = false;
+        }
+    }, {passive: false});
+
+    document.addEventListener('touchend', () => {
+        if (!isPtrDragging) return;
+        isPtrDragging = false;
+        
+        const diffY = ptrCurrentY - ptrStartY;
+        if (appContainer) appContainer.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+        if (ptrContainer) ptrContainer.style.transition = 'opacity 0.3s';
+        
+        if (diffY > threshold) {
+            if (ptrContainer) {
+                const textEl = ptrContainer.querySelector('.ptr-text');
+                if (textEl) textEl.textContent = 'Обновление...';
+            }
+            setTimeout(() => {
+                location.reload();
+            }, 300);
+        } else {
+            if (appContainer) appContainer.style.transform = `translateY(0)`;
+            if (ptrContainer) ptrContainer.style.opacity = '0';
+        }
+        ptrStartY = 0;
+        ptrCurrentY = 0;
+    });
+
     // Month Switcher
     prevMonthBtn.addEventListener('click', () => {
         currentMonth--;
