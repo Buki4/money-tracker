@@ -1200,49 +1200,7 @@ function setupEventListeners() {
         
         window.location.href = window.location.pathname + '?v=' + Date.now();
     });
-    // Pull to Refresh
-    let ptrStartY = 0;
-    let ptrCurrentY = 0;
-    const body = document.body;
-    let ptrIndicator = document.getElementById('ptrIndicator');
-    if (!ptrIndicator) {
-        ptrIndicator = document.createElement('div');
-        ptrIndicator.id = 'ptrIndicator';
-        ptrIndicator.innerHTML = '↻ Обновление...';
-        body.insertBefore(ptrIndicator, body.firstChild);
-    }
-    
-    document.addEventListener('touchstart', (e) => {
-        if (window.scrollY === 0) {
-            ptrStartY = e.touches[0].clientY;
-        }
-    }, {passive: true});
 
-    document.addEventListener('touchmove', (e) => {
-        if (window.scrollY === 0 && ptrStartY > 0) {
-            ptrCurrentY = e.touches[0].clientY;
-            let dy = ptrCurrentY - ptrStartY;
-            if (dy > 0 && dy < 100) {
-                ptrIndicator.style.transform = `translateY(${dy}px)`;
-                ptrIndicator.style.opacity = dy / 100;
-            }
-        }
-    }, {passive: true});
-
-    document.addEventListener('touchend', () => {
-        if (ptrCurrentY - ptrStartY > 60) {
-            if (navigator.vibrate) navigator.vibrate(50);
-            ptrIndicator.innerHTML = 'Загрузка...';
-            setTimeout(() => {
-                window.location.reload(true);
-            }, 500);
-        } else {
-            ptrIndicator.style.transform = `translateY(0px)`;
-            ptrIndicator.style.opacity = 0;
-        }
-        ptrStartY = 0;
-        ptrCurrentY = 0;
-    });
 
 
     // Modal Radio Buttons Logic
