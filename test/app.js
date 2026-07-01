@@ -788,6 +788,7 @@ function setupEventListeners() {
 
     document.addEventListener('touchmove', e => {
         if (!isPtrDragging) return;
+        if (openModals.length > 0) return; // Prevent PTR when modals are open
         ptrCurrentY = e.touches[0].clientY;
         const diffY = ptrCurrentY - ptrStartY;
         
@@ -1219,9 +1220,7 @@ function setupEventListeners() {
         });
     }
 
-    // Lesson Calculator Logic
-    categoryInput.addEventListener('change', toggleLessonFields);
-    
+    // Lesson Calculator Logic removed
 
 
     // Form Submit
@@ -1317,6 +1316,42 @@ function setupEventListeners() {
         addForm.reset();
         toggleFormFields('income');
     });
+
+    // Modal Swipe-to-Close
+    document.querySelectorAll('.modal').forEach(modal => {
+        let mStartY = 0;
+        let mCurrentY = 0;
+        const mContent = modal.querySelector('.modal-content');
+        if (!mContent) return;
+        
+        mContent.addEventListener('touchstart', e => {
+            mStartY = e.touches[0].clientY;
+            mContent.style.transition = 'none';
+        }, {passive: true});
+        
+        mContent.addEventListener('touchmove', e => {
+            if (mStartY === 0) return;
+            mCurrentY = e.touches[0].clientY;
+            const dy = mCurrentY - mStartY;
+            // Only allow swipe down when scroll is at top
+            if (dy > 0 && mContent.scrollTop <= 0) {
+                mContent.style.transform = `translateY(${dy}px)`;
+                if(e.cancelable) e.preventDefault();
+            }
+        }, {passive: false});
+        
+        mContent.addEventListener('touchend', e => {
+            if (mStartY === 0) return;
+            const dy = mCurrentY - mStartY;
+            mContent.style.transition = 'transform 0.3s ease';
+            mContent.style.transform = '';
+            if (dy > 100 && mContent.scrollTop <= 0) {
+                closeModal(modal);
+            }
+            mStartY = 0;
+            mCurrentY = 0;
+        }, {passive: true});
+    });
 }
 
 function updateCategoryOptions() {
@@ -1337,7 +1372,6 @@ function toggleFormFields(type) {
         categoryGroup.style.display = 'block';
         debtTypeGroup.style.display = 'none';
     }
-    toggleLessonFields();
 }
 
 
