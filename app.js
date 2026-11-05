@@ -410,8 +410,14 @@ function animateValue(obj, start, end, duration, formatFn) {
     window.requestAnimationFrame(step);
 }
 
+function getActiveView() {
+    if (currentView === 'analytics') return analyticsView;
+    if (currentView === 'debts') return debtsView;
+    return dashboardView;
+}
+
 function animateViewChange(direction) {
-    const container = currentView === 'dashboard' ? document.getElementById('dashboardView') : document.getElementById('debtsView');
+    const container = getActiveView();
     if(!container) return;
     container.classList.remove('view-sliding-left', 'view-sliding-right');
     void container.offsetWidth; // trigger reflow
@@ -1076,22 +1082,43 @@ function setupEventListeners() {
     const threshold = 150; // Increased threshold to make it less sensitive
 
     document.addEventListener('touchstart', e => {
-        const view = document.querySelector('.view.active');
-        if (view && view.scrollTop <= 0) {
+        if (openModals.length > 0) {
+            isPtrDragging = false;
+            return;
+        }
+
+        const activeView = getActiveView();
+        // ONLY activate PTR if view exists AND is scrolled to the absolute top (scrollTop <= 0)
+        if (activeView && activeView.scrollTop <= 0) {
             ptrStartY = e.touches[0].clientY;
             isPtrDragging = true;
             if (appContainer) appContainer.style.transition = 'none';
             if (ptrContainer) ptrContainer.style.transition = 'none';
+        } else {
+            isPtrDragging = false;
         }
     }, {passive: true});
 
     document.addEventListener('touchmove', e => {
         if (!isPtrDragging) return;
-        if (openModals.length > 0) return; // Prevent PTR when modals are open
+        if (openModals.length > 0) {
+            isPtrDragging = false;
+            return;
+        }
+
+        const activeView = getActiveView();
+        // CRUCIAL: If the view is scrolled down at all (scrollTop > 0), ABORT PTR immediately!
+        if (!activeView || activeView.scrollTop > 0) {
+            isPtrDragging = false;
+            if (appContainer) appContainer.style.transform = 'translateY(0)';
+            if (ptrContainer) ptrContainer.style.opacity = '0';
+            return;
+        }
+
         ptrCurrentY = e.touches[0].clientY;
         const diffY = ptrCurrentY - ptrStartY;
         
-        if (diffY > 0) {
+        if (diffY > 0 && activeView.scrollTop <= 0) {
             const pullDistance = diffY / 2.5; // Resistance
             if (appContainer) appContainer.style.transform = `translateY(${pullDistance}px)`;
             
@@ -1158,50 +1185,53 @@ function setupEventListeners() {
         render();
     });
 
+    // Switch View Helper
+    function switchView(viewName) {
+        if (currentView === viewName) return;
+        audioService.playClick();
+        const prevView = currentView;
+        currentView = viewName;
+
+        navHome.classList.toggle('active', viewName === 'dashboard');
+        navDebts.classList.toggle('active', viewName === 'debts');
+        if (navAnalytics) navAnalytics.classList.toggle('active', viewName === 'analytics');
+
+        const allViews = [dashboardView, debtsView, analyticsView].filter(Boolean);
+        allViews.forEach(v => {
+            v.classList.remove('active');
+            v.style.display = 'none';
+        });
+
+        const activeView = getActiveView();
+        if (activeView) {
+            activeView.classList.add('active');
+            activeView.style.display = 'block';
+        }
+
+        const direction = (viewName === 'analytics' || (viewName === 'debts' && prevView === 'dashboard')) ? 'left' : 'right';
+        animateViewChange(direction);
+
+        render();
+        if (viewName === 'analytics') {
+            renderAnalytics();
+        }
+    }
+
     // Bottom Nav
     navHome.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentView === 'dashboard') return;
-        audioService.playClick();
-        currentView = 'dashboard';
-        navHome.classList.add('active');
-        navDebts.classList.remove('active');
-        if (navAnalytics) navAnalytics.classList.remove('active');
-        debtsView.style.display = 'none';
-        if (analyticsView) analyticsView.style.display = 'none';
-        dashboardView.style.display = 'block';
-        animateViewChange('right');
-        render();
+        switchView('dashboard');
     });
 
     navDebts.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentView === 'debts') return;
-        audioService.playClick();
-        currentView = 'debts';
-        navDebts.classList.add('active');
-        navHome.classList.remove('active');
-        if (navAnalytics) navAnalytics.classList.remove('active');
-        dashboardView.style.display = 'none';
-        if (analyticsView) analyticsView.style.display = 'none';
-        debtsView.style.display = 'block';
-        animateViewChange('left');
-        render();
+        switchView('debts');
     });
 
     if (navAnalytics) {
         navAnalytics.addEventListener('click', (e) => {
             e.preventDefault();
-            if (currentView === 'analytics') return;
-            audioService.playClick();
-            currentView = 'analytics';
-            navAnalytics.classList.add('active');
-            navHome.classList.remove('active');
-            navDebts.classList.remove('active');
-            dashboardView.style.display = 'none';
-            debtsView.style.display = 'none';
-            if (analyticsView) analyticsView.style.display = 'block';
-            renderAnalytics();
+            switchView('analytics');
         });
     }
 
