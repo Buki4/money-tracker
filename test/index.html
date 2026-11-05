@@ -104,6 +104,42 @@
             </div>
         </div>
 
+        <!-- Analytics View -->
+        <div id="analyticsView" class="view" style="display:none;">
+            <div class="analytics-container">
+                <div class="section-title"><h3>Аналитика</h3></div>
+
+                <!-- Month comparison -->
+                <div class="analytics-card" id="analyticsComparison">
+                    <!-- filled by JS -->
+                </div>
+
+                <!-- Donut chart -->
+                <div class="analytics-card">
+                    <div class="analytics-card-title">Расходы по категориям</div>
+                    <div class="donut-wrapper">
+                        <svg id="donutChart" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+                        <div id="donutCenter" class="donut-center"></div>
+                    </div>
+                    <div id="donutLegend" class="donut-legend"></div>
+                </div>
+
+                <!-- Bar chart: last 6 months -->
+                <div class="analytics-card">
+                    <div class="analytics-card-title">Доходы и расходы (6 мес.)</div>
+                    <div class="bar-chart-wrapper">
+                        <svg id="barChart" viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" width="100%"></svg>
+                    </div>
+                </div>
+
+                <!-- Top categories -->
+                <div class="analytics-card">
+                    <div class="analytics-card-title">Топ категорий расходов</div>
+                    <div id="topCategories"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Bottom Navigation -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-view="dashboardView">
@@ -120,6 +156,11 @@
             <button class="nav-item" data-view="debtsView">
                 <span class="icon">💸</span>
                 <span class="label">Долги</span>
+            </button>
+
+            <button class="nav-item" data-view="analyticsView">
+                <span class="icon">📈</span>
+                <span class="label">Аналитика</span>
             </button>
         </nav>
 
@@ -176,6 +217,11 @@
                     <div class="form-group checkbox-group" id="pendingGroup" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
                         <input type="checkbox" id="pendingInput" style="width: 18px; height: 18px;">
                         <label for="pendingInput" style="margin: 0; color: var(--text-main);">Ожидается оплата ⏳</label>
+                    </div>
+
+                    <div class="form-group checkbox-group" id="recurringGroup" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <input type="checkbox" id="recurringInput" style="width: 18px; height: 18px;">
+                        <label for="recurringInput" style="margin: 0; color: var(--text-main);">Повторять каждый месяц 🔄</label>
                     </div>
 
                     <div class="form-group debt-type-group" id="debtTypeGroup" style="display: none;">

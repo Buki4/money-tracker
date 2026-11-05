@@ -12,7 +12,7 @@ window.addEventListener('unhandledrejection', function(e) {
 
 // State Management
 let state = {
-    transactions: [], // { id, tab, type, amount, category, person, note, date, status }
+    transactions: [], // { id, tab, type, amount, category, person, note, date, status, recurring }
     debts: [], // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
     tabNames: { drums: 'Барабаны', vocals: 'Вокал' },
     soundEnabled: true
@@ -48,8 +48,10 @@ let currentYear = new Date().getFullYear();
 const views = document.querySelectorAll('.view');
 const navHome = document.querySelector('.nav-item[data-view="dashboardView"]');
 const navDebts = document.querySelector('.nav-item[data-view="debtsView"]');
+const navAnalytics = document.querySelector('.nav-item[data-view="analyticsView"]');
 const dashboardView = document.getElementById('dashboardView');
 const debtsView = document.getElementById('debtsView');
+const analyticsView = document.getElementById('analyticsView');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabDrums = document.querySelector('.tab-btn[data-main-tab="drums"]');
 const tabVocals = document.querySelector('.tab-btn[data-main-tab="vocals"]');
@@ -171,6 +173,7 @@ function init() {
     loadData();
     setupEventListeners();
     updateMonthLabel();
+    processRecurring();
     
     renderSkeletons();
     setTimeout(() => {
@@ -403,6 +406,245 @@ function animateViewChange(direction) {
     }, 300);
 }
 
+// ===== ANALYTICS =====
+function renderAnalytics() {
+    const COLORS = ['#8b5cf6','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
+    const fmt = (v) => v.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' €';
+    
+    // --- Comparison block ---
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    
+    const getMonthStats = (month, year) => {
+        let income = 0, expense = 0;
+        state.transactions.forEach(tx => {
+            if (tx.tab !== currentTab) return;
+            const d = new Date(tx.date);
+            if (d.getMonth() === month && d.getFullYear() === year) {
+                if (tx.type === 'income' && tx.status !== 'pending') income += tx.amount;
+                if (tx.type === 'expense') expense += tx.amount;
+            }
+        });
+        return { income, expense, balance: income - expense };
+    };
+    
+    const cur = getMonthStats(currentMonth, currentYear);
+    const prev = getMonthStats(prevMonth, prevYear);
+    
+    const expDelta = prev.expense > 0 ? ((cur.expense - prev.expense) / prev.expense * 100) : 0;
+    const incDelta = prev.income > 0 ? ((cur.income - prev.income) / prev.income * 100) : 0;
+    
+    const deltaHtml = (val) => {
+        if (Math.abs(val) < 1) return `<span class="cmp-delta neutral">≈ 0%</span>`;
+        const cls = val > 0 ? 'up' : 'down';
+        const sign = val > 0 ? '▲' : '▼';
+        return `<span class="cmp-delta ${cls}">${sign} ${Math.abs(val).toFixed(0)}%</span>`;
+    };
+    
+    const months = ['Янв','Фев','Март','Апр','Май','Июнь','Июль','Авг','Сен','Окт','Ноя','Дек'];
+    const compEl = document.getElementById('analyticsComparison');
+    if (compEl) {
+        compEl.innerHTML = `
+            <div class="analytics-card-title">Сравнение с ${months[prevMonth]}</div>
+            <div class="analytics-comparison">
+                <div>
+                    <div class="cmp-label">Доходы</div>
+                    <div class="cmp-value" style="color:var(--income)">${fmt(cur.income)}</div>
+                    ${deltaHtml(incDelta)}
+                </div>
+                <div style="text-align:center;">
+                    <div class="cmp-label">Баланс</div>
+                    <div class="cmp-value" style="color:${cur.balance >= 0 ? 'var(--income)' : 'var(--expense)'}">${cur.balance >= 0 ? '+' : ''}${fmt(cur.balance)}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="cmp-label">Расходы</div>
+                    <div class="cmp-value" style="color:var(--expense)">${fmt(cur.expense)}</div>
+                    ${deltaHtml(expDelta)}
+                </div>
+            </div>`;
+    }
+    
+    // --- Donut chart (expenses by category) ---
+    const expByCategory = {};
+    state.transactions.forEach(tx => {
+        if (tx.tab !== currentTab) return;
+        const d = new Date(tx.date);
+        if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return;
+        if (tx.type !== 'expense') return;
+        expByCategory[tx.category] = (expByCategory[tx.category] || 0) + tx.amount;
+    });
+    
+    const donutSvg = document.getElementById('donutChart');
+    const donutCenter = document.getElementById('donutCenter');
+    const donutLegend = document.getElementById('donutLegend');
+    
+    if (donutSvg && donutCenter && donutLegend) {
+        const totalExp = Object.values(expByCategory).reduce((a, b) => a + b, 0);
+        donutCenter.innerHTML = `<div class="donut-total">${fmt(totalExp)}</div><div class="donut-label">Расходы</div>`;
+        
+        if (totalExp === 0) {
+            donutSvg.innerHTML = `<circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="30"/>`;
+            donutLegend.innerHTML = `<span style="font-size:13px;color:var(--text-muted)">Нет расходов в этом месяце</span>`;
+        } else {
+            const entries = Object.entries(expByCategory).sort((a, b) => b[1] - a[1]);
+            let paths = '';
+            let legendHtml = '';
+            let offset = -90; // start from top
+            const cx = 100, cy = 100, r = 70, strokeW = 30;
+            const circumference = 2 * Math.PI * r;
+            
+            entries.forEach(([catId, amount], i) => {
+                const pct = amount / totalExp;
+                const dashLen = pct * circumference;
+                const color = COLORS[i % COLORS.length];
+                const catLabel = (state.categories[currentTab] || []).find(c => c.id === catId)?.label || catId;
+                
+                paths += `<circle 
+                    cx="${cx}" cy="${cy}" r="${r}"
+                    fill="none"
+                    stroke="${color}"
+                    stroke-width="${strokeW}"
+                    stroke-dasharray="${dashLen} ${circumference - dashLen}"
+                    stroke-dashoffset="${-offset * circumference / 360}"
+                    transform="rotate(-90 ${cx} ${cy})"
+                    style="transition: stroke-dasharray 0.6s ease;"
+                />`;
+                offset += pct * 360;
+                
+                legendHtml += `<div class="donut-legend-item">
+                    <div class="donut-legend-dot" style="background:${color}"></div>
+                    <span>${catLabel} (${fmt(amount)})</span>
+                </div>`;
+            });
+            
+            donutSvg.innerHTML = paths;
+            donutLegend.innerHTML = legendHtml;
+        }
+    }
+    
+    // --- Bar chart: last 6 months income vs expense ---
+    const barSvg = document.getElementById('barChart');
+    if (barSvg) {
+        const barMonths = [];
+        for (let i = 5; i >= 0; i--) {
+            let m = currentMonth - i;
+            let y = currentYear;
+            if (m < 0) { m += 12; y--; }
+            barMonths.push({ m, y, label: months[m] });
+        }
+        
+        const barData = barMonths.map(({ m, y, label }) => {
+            const stats = getMonthStats(m, y);
+            return { label, income: stats.income, expense: stats.expense };
+        });
+        
+        const maxVal = Math.max(...barData.map(d => Math.max(d.income, d.expense)), 1);
+        const svgW = 320, svgH = 160;
+        const padL = 10, padR = 10, padT = 10, padB = 30;
+        const chartW = svgW - padL - padR;
+        const chartH = svgH - padT - padB;
+        const groupW = chartW / barMonths.length;
+        const barW = groupW * 0.3;
+        
+        let svgContent = '';
+        
+        barData.forEach((d, i) => {
+            const x = padL + i * groupW;
+            const incH = (d.income / maxVal) * chartH;
+            const expH = (d.expense / maxVal) * chartH;
+            
+            // Income bar (left of pair)
+            svgContent += `<rect x="${x + groupW * 0.1}" y="${padT + chartH - incH}" width="${barW}" height="${incH}" fill="#10b981" rx="3"/>`;
+            // Expense bar (right of pair)
+            svgContent += `<rect x="${x + groupW * 0.1 + barW + 2}" y="${padT + chartH - expH}" width="${barW}" height="${expH}" fill="#ef4444" rx="3"/>`;
+            // Label
+            svgContent += `<text x="${x + groupW / 2}" y="${svgH - 8}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="10" font-family="Inter,sans-serif">${d.label}</text>`;
+        });
+        
+        // Legend
+        svgContent += `<rect x="${svgW - 80}" y="10" width="10" height="10" fill="#10b981" rx="2"/>`;
+        svgContent += `<text x="${svgW - 66}" y="19" fill="rgba(255,255,255,0.5)" font-size="9" font-family="Inter,sans-serif">Доходы</text>`;
+        svgContent += `<rect x="${svgW - 80}" y="26" width="10" height="10" fill="#ef4444" rx="2"/>`;
+        svgContent += `<text x="${svgW - 66}" y="35" fill="rgba(255,255,255,0.5)" font-size="9" font-family="Inter,sans-serif">Расходы</text>`;
+        
+        barSvg.innerHTML = svgContent;
+    }
+    
+    // --- Top categories ---
+    const topEl = document.getElementById('topCategories');
+    if (topEl) {
+        const entries = Object.entries(expByCategory).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const totalExp = Object.values(expByCategory).reduce((a, b) => a + b, 0) || 1;
+        
+        if (entries.length === 0) {
+            topEl.innerHTML = `<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:10px 0;">Нет расходов</div>`;
+        } else {
+            topEl.innerHTML = entries.map(([catId, amount], i) => {
+                const pct = Math.round(amount / totalExp * 100);
+                const catLabel = (state.categories[currentTab] || []).find(c => c.id === catId)?.label || catId;
+                const color = COLORS[i % COLORS.length];
+                return `<div class="top-cat-row">
+                    <div class="top-cat-header">
+                        <span>${catLabel}</span>
+                        <span>${fmt(amount)} <span class="top-cat-pct">${pct}%</span></span>
+                    </div>
+                    <div class="top-cat-bar-bg">
+                        <div class="top-cat-bar-fill" style="width:${pct}%;background:${color}"></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+// ===== RECURRING TRANSACTIONS =====
+function processRecurring() {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    
+    const recurringSource = state.transactions.filter(tx => tx.recurring === true);
+    
+    let added = 0;
+    recurringSource.forEach(sourceTx => {
+        // Check if we already created a recurring copy for this month
+        const alreadyExists = state.transactions.some(tx => 
+            tx.sourceId === sourceTx.id &&
+            (() => {
+                const d = new Date(tx.date);
+                return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+            })()
+        );
+        
+        // Also skip if the source itself is from this month (don't double-count)
+        const sourceDate = new Date(sourceTx.date);
+        const sourceIsThisMonth = sourceDate.getMonth() === thisMonth && sourceDate.getFullYear() === thisYear;
+        
+        if (!alreadyExists && !sourceIsThisMonth) {
+            const newDate = new Date(thisYear, thisMonth, 1);
+            state.transactions.push({
+                id: Date.now().toString() + '_rec_' + sourceTx.id,
+                tab: sourceTx.tab,
+                type: sourceTx.type,
+                amount: sourceTx.amount,
+                category: sourceTx.category,
+                person: sourceTx.person || '',
+                note: (sourceTx.note || '') + ' 🔄',
+                status: 'completed',
+                date: newDate.toISOString(),
+                sourceId: sourceTx.id,
+                recurring: false // The copy itself is not a template
+            });
+            added++;
+        }
+    });
+    
+    if (added > 0) {
+        saveData();
+        showToast(`🔄 Добавлено ${added} повторяющихся транзакций`);
+    }
+}
+
 // Render Functions
 function render() {
     if(tabNameDrums) tabNameDrums.textContent = state.tabNames.drums || 'Барабаны';
@@ -410,6 +652,7 @@ function render() {
     
     renderDashboard();
     renderDebts();
+    if (currentView === 'analytics') renderAnalytics();
 }
 
 function renderSkeletons() {
@@ -532,6 +775,7 @@ function renderDashboard() {
             const personStr = tx.person ? ` • ${tx.person}` : '';
             const isPending = tx.status === 'pending';
             const pendingHtml = isPending ? `<div class="pending-badge" onclick="event.stopPropagation(); togglePending('${tx.id}')">⏳</div>` : '';
+            const recurringHtml = tx.recurring ? `<div style="font-size:14px;opacity:0.6;" title="Повторяется каждый месяц">🔄</div>` : '';
             
             const el = document.createElement('div');
             el.className = 'transaction-item stagger-item swipe-container';
@@ -548,6 +792,7 @@ function renderDashboard() {
                         <div class="tx-person">${personStr.replace(' • ', '')}</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
+                        ${recurringHtml}
                         ${pendingHtml}
                         <div class="tx-amount ${cls}" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
                             ${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
@@ -636,6 +881,11 @@ window.editTransaction = function(id) {
     const pendingInput = document.getElementById('pendingInput');
     if (pendingInput) {
         pendingInput.checked = (tx.status === 'pending');
+    }
+    
+    const recurringInput = document.getElementById('recurringInput');
+    if (recurringInput) {
+        recurringInput.checked = tx.recurring === true;
     }
     
     const btn = addForm.querySelector('button[type="submit"]');
@@ -867,7 +1117,9 @@ function setupEventListeners() {
         currentView = 'dashboard';
         navHome.classList.add('active');
         navDebts.classList.remove('active');
+        if (navAnalytics) navAnalytics.classList.remove('active');
         debtsView.style.display = 'none';
+        if (analyticsView) analyticsView.style.display = 'none';
         dashboardView.style.display = 'block';
         animateViewChange('right');
         render();
@@ -880,11 +1132,29 @@ function setupEventListeners() {
         currentView = 'debts';
         navDebts.classList.add('active');
         navHome.classList.remove('active');
+        if (navAnalytics) navAnalytics.classList.remove('active');
         dashboardView.style.display = 'none';
+        if (analyticsView) analyticsView.style.display = 'none';
         debtsView.style.display = 'block';
         animateViewChange('left');
         render();
     });
+
+    if (navAnalytics) {
+        navAnalytics.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentView === 'analytics') return;
+            audioService.playClick();
+            currentView = 'analytics';
+            navAnalytics.classList.add('active');
+            navHome.classList.remove('active');
+            navDebts.classList.remove('active');
+            dashboardView.style.display = 'none';
+            debtsView.style.display = 'none';
+            if (analyticsView) analyticsView.style.display = 'block';
+            renderAnalytics();
+        });
+    }
 
     // Tab Switching
     tabDrums.addEventListener('click', () => {
@@ -1262,6 +1532,7 @@ function setupEventListeners() {
             const txIndex = state.transactions.findIndex(t => t.id === editingTxId);
             if (txIndex !== -1 && transactionsToAdd.length > 0) {
                 const txData = transactionsToAdd[0];
+                const recurringInputEl = document.getElementById('recurringInput');
                 state.transactions[txIndex] = {
                     ...state.transactions[txIndex],
                     tab: currentTab,
@@ -1270,7 +1541,8 @@ function setupEventListeners() {
                     person: txData.person,
                     note: txData.note,
                     category: txData.category,
-                    status: txData.status || 'completed'
+                    status: txData.status || 'completed',
+                    recurring: recurringInputEl ? recurringInputEl.checked : false
                 };
             }
             editingTxId = null;
@@ -1292,6 +1564,7 @@ function setupEventListeners() {
                         date: dateObj.toISOString()
                     });
                 } else {
+                    const recurringInput = document.getElementById('recurringInput');
                     state.transactions.push({
                         id: (Date.now() + index).toString(),
                         tab: currentTab,
@@ -1301,7 +1574,8 @@ function setupEventListeners() {
                         person: txData.person,
                         note: txData.note,
                         status: txData.status || 'completed',
-                        date: dateObj.toISOString()
+                        date: dateObj.toISOString(),
+                        recurring: recurringInput ? recurringInput.checked : false
                     });
                 }
             });
@@ -1756,21 +2030,37 @@ window.togglePending = function(id) {
 
 // --- Swipe to Delete / Edit Logic ---
 function initSwipe(el, id) {
+    const content = el.querySelector('.swipe-content');
+    
     let startX = 0;
+    let startY = 0;
     let currentX = 0;
     let isDragging = false;
-    const content = el.querySelector('.swipe-content');
+    let isScrolling = null; // null = unknown, true = vertical scroll, false = horizontal swipe
     
     el.addEventListener('touchstart', (e) => {
         startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
         isDragging = true;
+        isScrolling = null;
+        currentX = 0;
         content.style.transition = 'none';
     }, { passive: true });
     
     el.addEventListener('touchmove', (e) => {
         if (!isDragging) return;
-        currentX = e.touches[0].clientX - startX;
-        // Limit max swipe distance
+        const deltaX = e.touches[0].clientX - startX;
+        const deltaY = e.touches[0].clientY - startY;
+        
+        // Determine gesture direction on first significant movement
+        if (isScrolling === null && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+            isScrolling = Math.abs(deltaY) > Math.abs(deltaX);
+        }
+        
+        // If vertical scroll — do not move the row
+        if (isScrolling) return;
+        
+        currentX = deltaX;
         if (currentX > 100) currentX = 100;
         if (currentX < -100) currentX = -100;
         content.style.transform = `translateX(${currentX}px)`;
@@ -1780,26 +2070,29 @@ function initSwipe(el, id) {
         isDragging = false;
         content.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
         
-        if (currentX < -60) {
-            // Swiped left - delete
-            content.style.transform = `translateX(-100%)`;
-            setTimeout(() => {
-                deleteTransaction(id);
-                if (typeof audioService !== 'undefined') audioService.playDelete();
-            }, 300);
-        } else if (currentX > 60) {
-            // Swiped right - edit
-            content.style.transform = `translateX(100%)`;
-            setTimeout(() => {
+        if (!isScrolling) {
+            if (currentX < -60) {
+                content.style.transform = `translateX(-100%)`;
+                setTimeout(() => {
+                    deleteTransaction(id);
+                    if (typeof audioService !== 'undefined') audioService.playDelete();
+                }, 300);
+            } else if (currentX > 60) {
+                content.style.transform = `translateX(100%)`;
+                setTimeout(() => {
+                    content.style.transform = `translateX(0)`;
+                    editTransaction(id);
+                    if (typeof audioService !== 'undefined') audioService.playClick();
+                }, 300);
+            } else {
                 content.style.transform = `translateX(0)`;
-                editTransaction(id);
-                if (typeof audioService !== 'undefined') audioService.playClick();
-            }, 300);
+            }
         } else {
-            // Snap back
+            // Was a scroll — snap back without action
             content.style.transform = `translateX(0)`;
         }
         currentX = 0;
+        isScrolling = null;
     });
 }
 
