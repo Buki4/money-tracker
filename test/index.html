@@ -147,6 +147,11 @@
                 <span class="label">Главная</span>
             </button>
             
+            <button class="nav-item" data-view="analyticsView">
+                <span class="icon">📈</span>
+                <span class="label">Аналитика</span>
+            </button>
+
             <div class="nav-item-add">
                 <button class="fab-btn" id="openAddModalBtn">
                     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -158,9 +163,9 @@
                 <span class="label">Долги</span>
             </button>
 
-            <button class="nav-item" data-view="analyticsView">
-                <span class="icon">📈</span>
-                <span class="label">Аналитика</span>
+            <button class="nav-item" id="navSettingsBtn">
+                <span class="icon">⚙️</span>
+                <span class="label">Настройки</span>
             </button>
         </nav>
 
@@ -171,6 +176,17 @@
                     <h3>Новая запись</h3>
                     <button class="close-modal" id="closeAddModalBtn">&times;</button>
                 </div>
+
+                <!-- Quick Templates Bar -->
+                <div id="templatesBar" class="templates-bar" style="display: none;">
+                    <div class="templates-header">
+                        <span class="templates-title">⚡ Быстрый ввод:</span>
+                    </div>
+                    <div class="templates-list" id="templatesList">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
                 <form id="addForm" class="add-form">
                     
                     <div class="form-group type-selector">
@@ -219,9 +235,9 @@
                         <label for="pendingInput" style="margin: 0; color: var(--text-main);">Ожидается оплата ⏳</label>
                     </div>
 
-                    <div class="form-group checkbox-group" id="recurringGroup" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-                        <input type="checkbox" id="recurringInput" style="width: 18px; height: 18px;">
-                        <label for="recurringInput" style="margin: 0; color: var(--text-main);">Повторять каждый месяц 🔄</label>
+                    <div class="form-group checkbox-group" id="saveTemplateGroup" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <input type="checkbox" id="saveTemplateInput" style="width: 18px; height: 18px;">
+                        <label for="saveTemplateInput" style="margin: 0; color: var(--text-main);">Сохранить как быстрый шаблон ⚡</label>
                     </div>
 
                     <div class="form-group debt-type-group" id="debtTypeGroup" style="display: none;">

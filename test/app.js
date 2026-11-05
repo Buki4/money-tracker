@@ -12,9 +12,10 @@ window.addEventListener('unhandledrejection', function(e) {
 
 // State Management
 let state = {
-    transactions: [], // { id, tab, type, amount, category, person, note, date, status, recurring }
+    transactions: [], // { id, tab, type, amount, category, person, note, date, status }
     debts: [], // { id, tab, type (owed_to_me/i_owe), amount, person, note, date }
     tabNames: { drums: 'Барабаны', vocals: 'Вокал' },
+    templates: [], // { id, tab, type, amount, category, person, note }
     soundEnabled: true
 };
 
@@ -49,6 +50,7 @@ const views = document.querySelectorAll('.view');
 const navHome = document.querySelector('.nav-item[data-view="dashboardView"]');
 const navDebts = document.querySelector('.nav-item[data-view="debtsView"]');
 const navAnalytics = document.querySelector('.nav-item[data-view="analyticsView"]');
+const navSettingsBtn = document.getElementById('navSettingsBtn');
 const dashboardView = document.getElementById('dashboardView');
 const debtsView = document.getElementById('debtsView');
 const analyticsView = document.getElementById('analyticsView');
@@ -173,7 +175,7 @@ function init() {
     loadData();
     setupEventListeners();
     updateMonthLabel();
-    processRecurring();
+    renderTemplates();
     
     renderSkeletons();
     setTimeout(() => {
@@ -300,10 +302,19 @@ function loadData() {
             state.debts = parsed.debts || [];
             state.tabNames = parsed.tabNames || { drums: 'Барабаны', vocals: 'Вокал' };
             state.categories = parsed.categories || null;
+            state.templates = parsed.templates || [];
             if (parsed.soundEnabled !== undefined) {
                 state.soundEnabled = parsed.soundEnabled;
             }
         } catch(e) { console.error(e); }
+    }
+
+    if (!state.templates || state.templates.length === 0) {
+        state.templates = [
+            { id: 'tpl_drums_1', tab: 'drums', type: 'income', amount: 25, category: 'lessons', person: 'Урок барабанов', note: '' },
+            { id: 'tpl_drums_2', tab: 'drums', type: 'expense', amount: 40, category: 'rehearsal', person: '', note: 'Репетиция' },
+            { id: 'tpl_vocals_1', tab: 'vocals', type: 'income', amount: 30, category: 'lessons', person: 'Урок вокала', note: '' }
+        ];
     }
     
     const soundToggle = document.getElementById('soundToggle');
@@ -597,52 +608,87 @@ function renderAnalytics() {
     }
 }
 
-// ===== RECURRING TRANSACTIONS =====
-function processRecurring() {
-    const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    
-    const recurringSource = state.transactions.filter(tx => tx.recurring === true);
-    
-    let added = 0;
-    recurringSource.forEach(sourceTx => {
-        // Check if we already created a recurring copy for this month
-        const alreadyExists = state.transactions.some(tx => 
-            tx.sourceId === sourceTx.id &&
-            (() => {
-                const d = new Date(tx.date);
-                return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
-            })()
-        );
-        
-        // Also skip if the source itself is from this month (don't double-count)
-        const sourceDate = new Date(sourceTx.date);
-        const sourceIsThisMonth = sourceDate.getMonth() === thisMonth && sourceDate.getFullYear() === thisYear;
-        
-        if (!alreadyExists && !sourceIsThisMonth) {
-            const newDate = new Date(thisYear, thisMonth, 1);
-            state.transactions.push({
-                id: Date.now().toString() + '_rec_' + sourceTx.id,
-                tab: sourceTx.tab,
-                type: sourceTx.type,
-                amount: sourceTx.amount,
-                category: sourceTx.category,
-                person: sourceTx.person || '',
-                note: (sourceTx.note || '') + ' 🔄',
-                status: 'completed',
-                date: newDate.toISOString(),
-                sourceId: sourceTx.id,
-                recurring: false // The copy itself is not a template
-            });
-            added++;
-        }
-    });
-    
-    if (added > 0) {
-        saveData();
-        showToast(`🔄 Добавлено ${added} повторяющихся транзакций`);
+// ===== QUICK TEMPLATES =====
+function renderTemplates() {
+    const templatesBar = document.getElementById('templatesBar');
+    const templatesList = document.getElementById('templatesList');
+    if (!templatesBar || !templatesList) return;
+
+    if (!state.templates) state.templates = [];
+    const list = state.templates.filter(t => t.tab === currentTab);
+    if (list.length === 0) {
+        templatesBar.style.display = 'none';
+        return;
     }
+
+    templatesBar.style.display = 'block';
+    templatesList.innerHTML = '';
+
+    list.forEach(tpl => {
+        const chip = document.createElement('div');
+        chip.className = `template-chip ${tpl.type}`;
+        const catLabel = (state.categories && state.categories[currentTab] ? state.categories[currentTab] : categories[currentTab])?.find(c => c.id === tpl.category)?.label || tpl.category;
+        const title = tpl.person || tpl.note || catLabel || 'Запись';
+        const sign = tpl.type === 'income' ? '+' : '-';
+
+        chip.innerHTML = `
+            <span class="template-chip-title">⚡ ${title}</span>
+            <span class="template-chip-amount">${sign}${tpl.amount} €</span>
+            <button type="button" class="template-chip-del" title="Удалить шаблон">&times;</button>
+        `;
+
+        // Delete template
+        const delBtn = chip.querySelector('.template-chip-del');
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.templates = state.templates.filter(t => t.id !== tpl.id);
+            saveData();
+            renderTemplates();
+            showToast('Шаблон удален');
+        });
+
+        // Apply template
+        chip.addEventListener('click', () => {
+            applyTemplate(tpl, chip);
+        });
+
+        templatesList.appendChild(chip);
+    });
+}
+
+function applyTemplate(tpl, chipEl) {
+    if (chipEl) {
+        chipEl.classList.add('active-flash');
+        setTimeout(() => chipEl.classList.remove('active-flash'), 250);
+    }
+    if (navigator.vibrate) navigator.vibrate(30);
+    if (typeof audioService !== 'undefined') audioService.playClick();
+
+    // Set Type
+    const typeInput = document.querySelector(`input[name="type"][value="${tpl.type}"]`);
+    if (typeInput) typeInput.checked = true;
+    toggleFormFields(tpl.type);
+
+    // Set Amount
+    const amountInput = document.getElementById('amountInput');
+    if (amountInput) {
+        amountInput.value = tpl.amount.toLocaleString('ru-RU');
+    }
+
+    // Set Category
+    if (tpl.type !== 'debt') {
+        updateCategoryOptions();
+        if (categoryInput) categoryInput.value = tpl.category;
+    }
+
+    // Set Person & Note
+    const personInput = document.getElementById('personInput');
+    if (personInput) personInput.value = tpl.person || '';
+
+    const noteInput = document.getElementById('noteInput');
+    if (noteInput) noteInput.value = tpl.note || '';
+
+    showToast(`Шаблон "${tpl.person || tpl.note || 'Запись'}" применен!`);
 }
 
 // Render Functions
@@ -775,7 +821,6 @@ function renderDashboard() {
             const personStr = tx.person ? ` • ${tx.person}` : '';
             const isPending = tx.status === 'pending';
             const pendingHtml = isPending ? `<div class="pending-badge" onclick="event.stopPropagation(); togglePending('${tx.id}')">⏳</div>` : '';
-            const recurringHtml = tx.recurring ? `<div style="font-size:14px;opacity:0.6;" title="Повторяется каждый месяц">🔄</div>` : '';
             
             const el = document.createElement('div');
             el.className = 'transaction-item stagger-item swipe-container';
@@ -792,7 +837,6 @@ function renderDashboard() {
                         <div class="tx-person">${personStr.replace(' • ', '')}</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        ${recurringHtml}
                         ${pendingHtml}
                         <div class="tx-amount ${cls}" onclick="editTransaction('${tx.id}')" style="cursor: pointer;">
                             ${sign}${tx.amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
@@ -882,11 +926,12 @@ window.editTransaction = function(id) {
     if (pendingInput) {
         pendingInput.checked = (tx.status === 'pending');
     }
+
+    const templatesBar = document.getElementById('templatesBar');
+    if (templatesBar) templatesBar.style.display = 'none';
     
-    const recurringInput = document.getElementById('recurringInput');
-    if (recurringInput) {
-        recurringInput.checked = tx.recurring === true;
-    }
+    const saveTemplateInput = document.getElementById('saveTemplateInput');
+    if (saveTemplateInput) saveTemplateInput.checked = false;
     
     const btn = addForm.querySelector('button[type="submit"]');
     if(btn) btn.textContent = 'Сохранить изменения';
@@ -1165,6 +1210,7 @@ function setupEventListeners() {
         tabVocals.classList.remove('active');
         animateViewChange('right');
         render();
+        renderTemplates();
     });
 
     tabVocals.addEventListener('click', () => {
@@ -1175,6 +1221,7 @@ function setupEventListeners() {
         tabDrums.classList.remove('active');
         animateViewChange('left');
         render();
+        renderTemplates();
     });
 
     // Modal
@@ -1182,6 +1229,7 @@ function setupEventListeners() {
         if (navigator.vibrate) navigator.vibrate(50);
         openModal(addModal);
         updateCategoryOptions();
+        renderTemplates();
         
         // Load last used type and category
         const lastType = localStorage.getItem('lastAddType') || 'income';
@@ -1195,6 +1243,9 @@ function setupEventListeners() {
             categoryInput.value = lastCategory;
         }
 
+        const saveTemplateInput = document.getElementById('saveTemplateInput');
+        if (saveTemplateInput) saveTemplateInput.checked = false;
+
         setTimeout(() => document.getElementById('amountInput').focus(), 100);
     });
 
@@ -1203,16 +1254,23 @@ function setupEventListeners() {
         addForm.reset();
         toggleFormFields('income');
         editingTxId = null;
+        const saveTemplateInput = document.getElementById('saveTemplateInput');
+        if (saveTemplateInput) saveTemplateInput.checked = false;
         const btn = addForm.querySelector('button[type="submit"]');
         if(btn) btn.textContent = 'Добавить';
     });
 
     // Settings Modal
-    openSettingsBtn.addEventListener('click', () => {
+    const openSettingsHandler = () => {
+        if (navigator.vibrate) navigator.vibrate(30);
+        audioService.playClick();
         tabNameInput1.value = state.tabNames.drums || '';
         tabNameInput2.value = state.tabNames.vocals || '';
         openModal(settingsModal);
-    });
+    };
+
+    if (openSettingsBtn) openSettingsBtn.addEventListener('click', openSettingsHandler);
+    if (navSettingsBtn) navSettingsBtn.addEventListener('click', openSettingsHandler);
 
     closeSettingsModalBtn.addEventListener('click', () => {
         closeModal(settingsModal);
@@ -1532,7 +1590,6 @@ function setupEventListeners() {
             const txIndex = state.transactions.findIndex(t => t.id === editingTxId);
             if (txIndex !== -1 && transactionsToAdd.length > 0) {
                 const txData = transactionsToAdd[0];
-                const recurringInputEl = document.getElementById('recurringInput');
                 state.transactions[txIndex] = {
                     ...state.transactions[txIndex],
                     tab: currentTab,
@@ -1541,8 +1598,7 @@ function setupEventListeners() {
                     person: txData.person,
                     note: txData.note,
                     category: txData.category,
-                    status: txData.status || 'completed',
-                    recurring: recurringInputEl ? recurringInputEl.checked : false
+                    status: txData.status || 'completed'
                 };
             }
             editingTxId = null;
@@ -1564,7 +1620,6 @@ function setupEventListeners() {
                         date: dateObj.toISOString()
                     });
                 } else {
-                    const recurringInput = document.getElementById('recurringInput');
                     state.transactions.push({
                         id: (Date.now() + index).toString(),
                         tab: currentTab,
@@ -1574,17 +1629,42 @@ function setupEventListeners() {
                         person: txData.person,
                         note: txData.note,
                         status: txData.status || 'completed',
-                        date: dateObj.toISOString(),
-                        recurring: recurringInput ? recurringInput.checked : false
+                        date: dateObj.toISOString()
                     });
                 }
             });
+
+            const saveTemplateInput = document.getElementById('saveTemplateInput');
+            if (saveTemplateInput && saveTemplateInput.checked && type !== 'debt' && amount > 0) {
+                if (!state.templates) state.templates = [];
+                const exists = state.templates.some(tpl =>
+                    tpl.tab === currentTab &&
+                    tpl.type === type &&
+                    tpl.amount === amount &&
+                    (tpl.person || '') === (person || '') &&
+                    tpl.category === category
+                );
+                if (!exists) {
+                    state.templates.push({
+                        id: 'tpl_' + Date.now(),
+                        tab: currentTab,
+                        type: type,
+                        amount: amount,
+                        category: category,
+                        person: person,
+                        note: note
+                    });
+                }
+                saveTemplateInput.checked = false;
+            }
+
             showToast('Успешно добавлено');
             audioService.playSuccess();
         }
 
         saveData();
         render();
+        renderTemplates();
         
         closeModal(addModal);
         addForm.reset();
