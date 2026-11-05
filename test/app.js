@@ -202,10 +202,14 @@ function init() {
     
     // Check if JSON backup is needed (>7 days)
     const lastBackupStr = localStorage.getItem('lastFileBackupDate');
-    const settingsBtn = document.getElementById('openSettingsBtn');
+    const settingsBtn = document.getElementById('navSettingsBtn');
     if (!lastBackupStr || (Date.now() - parseInt(lastBackupStr)) > 7 * 24 * 60 * 60 * 1000) {
         if (settingsBtn) {
-            settingsBtn.innerHTML = '⚙️<span style="position:absolute; top:8px; right:8px; width:8px; height:8px; background:red; border-radius:50%;"></span>';
+            const iconEl = settingsBtn.querySelector('.icon');
+            if (iconEl && !iconEl.querySelector('.backup-dot')) {
+                iconEl.style.position = 'relative';
+                iconEl.innerHTML += '<span class="backup-dot" style="position:absolute; top:-2px; right:-4px; width:7px; height:7px; background:#ef4444; border-radius:50%;"></span>';
+            }
         }
     }
 
@@ -1321,8 +1325,11 @@ function setupEventListeners() {
             link.click();
             document.body.removeChild(link);
             localStorage.setItem('lastFileBackupDate', Date.now());
-            const settingsBtn = document.getElementById('openSettingsBtn');
-            if (settingsBtn) settingsBtn.innerHTML = '⚙️'; // Remove red dot
+            const settingsBtn = document.getElementById('navSettingsBtn');
+            if (settingsBtn) {
+                const dot = settingsBtn.querySelector('.backup-dot');
+                if (dot) dot.remove();
+            }
             showToast('Бэкап сохранен!');
         });
     }
